@@ -2,9 +2,21 @@ import { ImageWithFallback } from './utils/ImageWithFallback';
 import { Button } from './ui/button';
 import { Zap } from 'lucide-react';
 
+// Obtener la función de navegación del contexto del App
+// Si no existe, usar scroll por defecto
+const getNavigateFunction = () => {
+  // @ts-ignore - Se pasa desde el App principal
+  return window.__navigate__;
+};
+
 export function Hero() {
   const scrollToBeta = () => {
-    document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
+    const navigate = getNavigateFunction();
+    if (navigate) {
+      navigate('register');
+    } else {
+      document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
