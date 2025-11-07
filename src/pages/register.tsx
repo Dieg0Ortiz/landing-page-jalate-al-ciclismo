@@ -1,248 +1,229 @@
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
-import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Zap, UserCircle } from 'lucide-react';
-import { useAuth } from './AuthContext';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { ImageWithFallback } from '../components/utils/ImageWithFallback';
+import { UserPlus, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface UserData {
+  email: string;
+  password: string;
+  name?: string;
+}
 
 interface RegisterProps {
+  onRegisterSuccess: (email: string) => void;
   onNavigate: (page: string) => void;
 }
 
-export function Register({ onNavigate }: RegisterProps) {
-  const [nombre, setNombre] = useState('');
-  const [apellidoPaterno, setApellidoPaterno] = useState('');
-  const [apellidoMaterno, setApellidoMaterno] = useState('');
-  const [correo, setCorreo] = useState('');
+export function Register({ onRegisterSuccess, onNavigate }: RegisterProps) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [urlFoto, setUrlFoto] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const { register } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validations
     if (password !== confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      toast.error('Las contraseñas no coinciden');
       return;
     }
-    if (nombre && apellidoPaterno && correo && password) {
-      // Combinar nombre completo para el registro
-      const nombreCompleto = `${nombre} ${apellidoPaterno}`;
-      register(nombreCompleto, correo, password);
-      onNavigate('dashboard');
+
+    if (password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
     }
+
+    // Get existing users
+    const usersData = localStorage.getItem('users');
+    const users: UserData[] = usersData ? JSON.parse(usersData) : [];
+
+    // Check if email already exists
+    if (users.some((u) => u.email === email)) {
+      toast.error('Este email ya está registrado');
+      return;
+    }
+
+    // Add new user
+    const newUser: UserData = {
+      name: name,
+      email: email,
+      password: password,
+    };
+
+    users.push(newUser);
+    localStorage.setItem('users', JSON.stringify(users));
+    localStorage.setItem('currentUser', newUser.email);
+    onRegisterSuccess(newUser.email);
+    toast.success(`¡Cuenta creada exitosamente! Bienvenido, ${name}!`);
+    
+    // Clear form
+    setName('');
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    onNavigate('home');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{ backgroundColor: '#F2F2F7' }}>
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-3xl shadow-xl p-8" style={{ border: '1px solid #E5E5EA' }}>
+    <div className="min-h-screen flex">
+      {/* Left Side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: '#FFFFFF' }}>
+        <div className="w-full max-w-md">
+          {/* Back Button */}
           <button
             onClick={() => onNavigate('home')}
-            className="mb-6 flex items-center text-sm hover:opacity-70 transition-opacity"
+            className="flex items-center gap-2 mb-8 transition-opacity hover:opacity-70"
             style={{ color: '#8E8E93' }}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
+            <ArrowLeft className="h-5 w-5" />
+            Volver al inicio
           </button>
 
-          <div className="text-center mb-8">
-            <Zap className="h-12 w-12 mx-auto mb-4" style={{ color: '#1C1C1E' }} />
-            <h1 className="text-3xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="mb-2" style={{ color: '#1C1C1E' }}>
               Crear Cuenta
             </h1>
-            <p className="text-sm" style={{ color: '#8E8E93' }}>
-              Únete a la comunidad de ciclistas
+            <p style={{ color: '#8E8E93' }}>
+              Únete a la revolución del ciclismo con IA
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nombre */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Nombre *
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <User className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type="text"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-offset-0"
-                  style={{ 
-                    borderColor: '#E5E5EA', 
-                    backgroundColor: '#F2F2F7',
-                    focusRingColor: '#007AFF'
-                  }}
-                  placeholder="Juan"
-                  maxLength={45}
-                  required
-                />
-              </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="name" style={{ color: '#1C1C1E' }}>
+                Nombre Completo
+              </Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Tu nombre"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
             </div>
 
-            {/* Apellido Paterno */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Apellido Paterno *
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <User className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type="text"
-                  value={apellidoPaterno}
-                  onChange={(e) => setApellidoPaterno(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="Pérez"
-                  maxLength={45}
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" style={{ color: '#1C1C1E' }}>
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
             </div>
 
-            {/* Apellido Materno */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Apellido Materno
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <User className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type="text"
-                  value={apellidoMaterno}
-                  onChange={(e) => setApellidoMaterno(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="García"
-                  maxLength={45}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" style={{ color: '#1C1C1E' }}>
+                Contraseña
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Correo Electrónico *
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Mail className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type="email"
-                  value={correo}
-                  onChange={(e) => setCorreo(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="tu@email.com"
-                  maxLength={45}
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password" style={{ color: '#1C1C1E' }}>
+                Confirmar Contraseña
+              </Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Repite tu contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
             </div>
 
-            {/* Contraseña */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Contraseña *
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Lock className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="••••••••"
-                  maxLength={85}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 transition-opacity"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                  ) : (
-                    <Eye className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                  )}
-                </button>
-              </div>
-            </div>
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl"
+              style={{ 
+                backgroundColor: '#1C1C1E',
+                color: '#FFFFFF'
+              }}
+            >
+              <UserPlus className="mr-2 h-5 w-5" />
+              Crear Cuenta
+            </Button>
+          </form>
 
-            {/* Confirmar Contraseña */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                Confirmar Contraseña *
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Lock className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* URL Foto (Opcional) */}
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#1C1C1E' }}>
-                URL de Foto de Perfil (Opcional)
-              </label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <UserCircle className="h-5 w-5" style={{ color: '#8E8E93' }} />
-                </div>
-                <input
-                  type="url"
-                  value={urlFoto}
-                  onChange={(e) => setUrlFoto(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 rounded-xl border focus:outline-none focus:ring-2"
-                  style={{ borderColor: '#E5E5EA', backgroundColor: '#F2F2F7' }}
-                  placeholder="https://ejemplo.com/foto.jpg"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <Button
-                type="submit"
-                className="w-full py-3 rounded-xl font-semibold hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: '#1C1C1E', color: '#FFFFFF' }}
-              >
-                Crear Cuenta
-              </Button>
-            </div>
-
-            <p className="text-center text-sm pt-2" style={{ color: '#8E8E93' }}>
-              ¿Ya tienes cuenta?{' '}
+          {/* Login Link */}
+          <div className="mt-6 text-center">
+            <p style={{ color: '#8E8E93' }}>
+              ¿Ya tienes una cuenta?{' '}
               <button
-                type="button"
                 onClick={() => onNavigate('login')}
-                className="font-semibold hover:underline"
+                className="transition-opacity hover:opacity-70"
                 style={{ color: '#007AFF' }}
               >
-                Inicia sesión
+                Inicia sesión aquí
               </button>
             </p>
-          </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <ImageWithFallback
+          src="https://images.unsplash.com/photo-1759306581543-8d44dfdd2d87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjeWNsaW5nJTIwcm91dGUlMjBvdXRkb29yc3xlbnwxfHx8fDE3NjE0NDg5ODF8MA&ixlib=rb-4.1.0&q=80&w=1080"
+          alt="Ciclista en ruta"
+          className="w-full h-full object-cover"
+        />
+        <div 
+          className="absolute inset-0"
+          style={{ backgroundColor: 'rgba(0, 122, 255, 0.1)' }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center p-12">
+          <div className="text-center">
+            <h2 className="text-4xl mb-4" style={{ color: '#FFFFFF' }}>
+              Comienza tu aventura
+            </h2>
+            <p className="text-xl" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Rutas inteligentes, navegación offline, análisis con IA
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,89 +1,102 @@
-import { useState, useEffect } from 'react';
+import { User, LogOut, LogIn, UserPlus } from 'lucide-react';
 import { Button } from './ui/button';
-import { Menu, X, Zap } from 'lucide-react';
-import { useAuth } from '../pages/AuthContext';
+import { toast } from 'sonner';
 
-interface NavbarProps {
-  onNavigate: (page: string) => void;
+interface UserData {
+  email: string;
+  password: string;
+  name?: string;
 }
 
-export function Navbar({ onNavigate }: NavbarProps) {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
+interface NavbarProps {
+  currentUser: string | null;
+  onNavigate: (page: string) => void;
+  onLogout: () => void;
+}
 
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+export function Navbar({ currentUser, onNavigate, onLogout }: NavbarProps) {
+  const handleLogout = () => {
+    onLogout();
+    toast.success('Sesión cerrada exitosamente');
+  };
 
-  if (isAuthenticated) return null;
+  const getUserName = () => {
+    if (!currentUser) return '';
+    const usersData = localStorage.getItem('users');
+    const users: UserData[] = usersData ? JSON.parse(usersData) : [];
+    const user = users.find((u) => u.email === currentUser);
+    return user?.name || user?.email || '';
+  };
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/95 backdrop-blur-md shadow-md' : 'bg-transparent'
-      }`}
+    <nav 
+      className="fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-sm"
+      style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#E5E5EA'
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <button onClick={() => onNavigate('home')} className="flex items-center space-x-2">
-            <Zap className="h-6 w-6" style={{ color: '#1C1C1E' }} />
-            <span className="text-xl font-bold" style={{ color: '#1C1C1E' }}>
-              Jalate al Ciclismo
-            </span>
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <button 
+            onClick={() => onNavigate('home')}
+            className="flex items-center transition-opacity hover:opacity-70"
+          >
+            <h3 style={{ color: '#1C1C1E' }}>Jalate al Ciclismo</h3>
           </button>
 
-          <div className="hidden md:flex items-center space-x-8">
-            <Button variant="ghost" onClick={() => onNavigate('login')} style={{ color: '#1C1C1E' }}>
-              Iniciar Sesión
-            </Button>
-            <Button
-              onClick={() => onNavigate('register')}
-              className="px-6 py-2 rounded-xl"
-              style={{ backgroundColor: '#1C1C1E', color: '#FFFFFF' }}
-            >
-              Registrarse
-            </Button>
-          </div>
-
-          <button className="md:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" style={{ color: '#1C1C1E' }} />
+          {/* Auth Buttons */}
+          <div className="flex items-center gap-3">
+            {currentUser ? (
+              <>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ backgroundColor: '#F5F5F5' }}>
+                  <User className="h-4 w-4" style={{ color: '#007AFF' }} />
+                  <span className="text-sm" style={{ color: '#1C1C1E' }}>{getUserName()}</span>
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  className="rounded-lg border-2"
+                  style={{ 
+                    borderColor: '#E5E5EA',
+                    color: '#1C1C1E'
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Cerrar Sesión
+                </Button>
+              </>
             ) : (
-              <Menu className="h-6 w-6" style={{ color: '#1C1C1E' }} />
+              <>
+                <Button
+                  onClick={() => onNavigate('login')}
+                  variant="outline"
+                  className="rounded-lg border-2"
+                  style={{ 
+                    borderColor: '#E5E5EA',
+                    color: '#1C1C1E'
+                  }}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Iniciar Sesión
+                </Button>
+                <Button
+                  onClick={() => onNavigate('register')}
+                  className="rounded-lg"
+                  style={{ 
+                    backgroundColor: '#1C1C1E',
+                    color: '#FFFFFF'
+                  }}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Registrarse
+                </Button>
+              </>
             )}
-          </button>
+          </div>
         </div>
       </div>
-
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t" style={{ borderColor: '#E5E5EA' }}>
-          <div className="px-4 py-4 space-y-3">
-            <Button
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                onNavigate('login');
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              Iniciar Sesión
-            </Button>
-            <Button
-              className="w-full rounded-xl"
-              onClick={() => {
-                onNavigate('register');
-                setIsMobileMenuOpen(false);
-              }}
-              style={{ backgroundColor: '#1C1C1E', color: '#FFFFFF' }}
-            >
-              Registrarse
-            </Button>
-          </div>
-        </div>
-      )}
     </nav>
   );
 }

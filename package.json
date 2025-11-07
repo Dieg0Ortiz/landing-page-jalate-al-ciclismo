@@ -1,7 +1,24 @@
 {
-      "name": "Landing Page Jalate al Ciclismo",
+      "name": "landing-page-jalate-al-ciclismo",
       "version": "0.1.0",
       "private": true,
+      "description": "This is a code bundle for Landing Page Jalate al Ciclismo. The original project is available at https://www.figma.com/design/W8KLL8uUemloJWaZoxsQFW/Landing-Page-Jalate-al-Ciclismo.",
+      "homepage": "https://github.com/Dieg0Ortiz/landing-page-jalate-al-ciclismo#readme",
+      "bugs": {
+            "url": "https://github.com/Dieg0Ortiz/landing-page-jalate-al-ciclismo/issues"
+      },
+      "repository": {
+            "type": "git",
+            "url": "git+https://github.com/Dieg0Ortiz/landing-page-jalate-al-ciclismo.git"
+      },
+      "license": "ISC",
+      "author": "",
+      "type": "commonjs",
+      "main": "index.js",
+      "scripts": {
+            "dev": "vite",
+            "build": "vite build"
+      },
       "dependencies": {
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -51,9 +68,5 @@
             "@types/node": "^20.10.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
             "vite": "6.3.5"
-      },
-      "scripts": {
-            "dev": "vite",
-            "build": "vite build"
       }
 }
