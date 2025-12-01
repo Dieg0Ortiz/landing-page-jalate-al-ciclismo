@@ -80,7 +80,7 @@ const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
     try {
       // Llamada a la API
-      const response = await fetch('http://127.0.0.1:8000/auth/register', {
+      const response = await fetch('https://jalatealciclismo.ddns.net/auth/v1/register', {
         method: 'POST',
         body: formData, // NO incluir Content-Type, el navegador lo configura automáticamente
       });

@@ -36,7 +36,7 @@ export function Hero() {
           {/* Text Content */}
           <div className="space-y-6">
             <h1 className="text-[3.5rem] leading-[1.1] tracking-tight" style={{ color: '#1C1C1E' }}>
-              Tu Copiloto de IA para Ciclismo. Deja de planificar, empieza a rodar.
+              Tu Copiloto de IA para Ciclismo GABO HERMOSO. Deja de planificar, empieza a rodar.
             </h1>
             <p className="text-[1.25rem] leading-relaxed" style={{ color: '#8E8E93' }}>
               Genera rutas inteligentes con tu voz, navega 100% offline y entiende la historia detrás de cada pedaleo. Todo en un solo lugar.
