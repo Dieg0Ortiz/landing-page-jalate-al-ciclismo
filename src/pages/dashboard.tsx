@@ -9,10 +9,13 @@ import {
   Navigation,
   TrendingUp,
   LogOut,
+  ArrowBigLeft,
   MapPin,
+  MapIcon,
   Clock,
   Send,
   Sparkles,
+  BikeIcon,
   Play,
   Pause,
   Square,
@@ -23,6 +26,8 @@ import { useAuth } from './AuthContext';
 
 import { CreateEventManual } from './CreateEventManual'
 import { CreateRouteManual } from './CreateRouteManual'
+import MapView from './MapView';
+import IAChat from './IAChat';
 
 export default function Dashboard() {
   const [activeView, setActiveView] = useState('dashboard');
@@ -37,6 +42,8 @@ export default function Dashboard() {
 const navItems = [
   { icon: HomeIcon, label: 'Dashboard', id: 'dashboard' },
   { icon: Navigation, label: 'Planear', id: 'plan' },
+  { icon: MapIcon, label: 'Map', id: 'map' },
+  { icon: BikeIcon, label: 'Copiloto', id: 'chat' },
   { icon: Calendar, label: 'Eventos', id: 'events' },
   { icon: Activity, label: 'Actividades', id: 'activities' },
 ];
@@ -126,7 +133,9 @@ const navItems = [
       <div className="flex-1 flex flex-col min-h-screen">
         {activeView === 'dashboard' && <DashboardView user={user} setActiveView={setActiveView} />} 
         {activeView === 'plan' && <EventsView setActiveView={setActiveView} />} 
+        {activeView === 'map' && <MapView setActiveView={setActiveView} />} 
         {activeView === 'events' && <EventsView setActiveView={setActiveView} />} 
+        {activeView === 'chat' && <IAChat setActiveView={setActiveView} />} 
         {activeView === 'activities' && <ActivitiesView />}
         {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={setActiveView} />} 
         {activeView === 'create-event-manual' && <CreateEventManual setActiveView={setActiveView} />} 
@@ -359,69 +368,74 @@ function EventsView({ setActiveView }: { setActiveView: (view: string) => void }
   return (
     <>
       <div className="bg-white shadow-sm" style={{ borderBottom: '1px solid #E5E5EA' }}>
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
-          <h1 className="text-2xl lg:text-3xl font-bold mb-1" style={{ color: '#1C1C1E' }}>
-            Eventos
-          </h1>
+  <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
+    <h1 className="text-2xl lg:text-3xl font-bold mb-1" style={{ color: '#1C1C1E' }}>
+      Eventos
+    </h1>
+    <p className="text-sm lg:text-base" style={{ color: '#8E8E93' }}>
+      Crea y gestiona tus eventos ciclistas
+    </p>
+  </div>
+</div>
+
+{/* CONTENEDOR CENTRADO */}
+<div className="flex-1 overflow-auto flex items-center justify-center">
+  <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8 space-y-4 w-full">
+
+    {/* Crear Evento Personalizado */}
+    <div 
+      onClick={() => setActiveView('create-event-manual')}
+      className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm hover:shadow-md transition-all cursor-pointer"
+      style={{ border: '1px solid #E5E5EA' }}
+    >
+      <div className="flex items-start space-x-4">
+        <div 
+          className="p-3 rounded-xl flex-shrink-0"
+          style={{ backgroundColor: '#007AFF' }}
+        >
+          <Calendar className="h-6 w-6" style={{ color: '#FFFFFF' }} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
+            Crear Evento Personalizado
+          </h3>
           <p className="text-sm lg:text-base" style={{ color: '#8E8E93' }}>
-            Crea y gestiona tus eventos ciclistas
+            Define manualmente tu ruta en el mapa, agrega puntos de control y configura todos los detalles de tu evento.
           </p>
         </div>
       </div>
+    </div>
 
-      <div className="flex-1 overflow-auto pb-24 lg:pb-8">
-        <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8 space-y-4">
-          {/* Crear Evento Personalizado */}
-          <div 
-            onClick={() => setActiveView('create-event-manual')}
-            className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm hover:shadow-md transition-all cursor-pointer"
-            style={{ border: '1px solid #E5E5EA' }}
-          >
-            <div className="flex items-start space-x-4">
-              <div 
-                className="p-3 rounded-xl flex-shrink-0"
-                style={{ backgroundColor: '#007AFF' }}
-              >
-                <Calendar className="h-6 w-6" style={{ color: '#FFFFFF' }} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
-                  Crear Evento Personalizado
-                </h3>
-                <p className="text-sm lg:text-base" style={{ color: '#8E8E93' }}>
-                  Define manualmente tu ruta en el mapa, agrega puntos de control y configura todos los detalles de tu evento.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Crear Evento con IA */}
-          <div 
-            className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm opacity-60"
-            style={{ border: '1px solid #E5E5EA' }}
-          >
-            <div className="flex items-start space-x-4">
-              <div 
-                className="p-3 rounded-xl flex-shrink-0"
-                style={{ backgroundColor: '#8E8E93' }}
-              >
-                <Sparkles className="h-6 w-6" style={{ color: '#FFFFFF' }} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
-                  Crear Evento con IA
-                  <span className="ml-2 text-xs font-normal px-2 py-1 rounded-full" style={{ backgroundColor: '#FF9500', color: '#FFFFFF' }}>
-                    Próximamente
-                  </span>
-                </h3>
-                <p className="text-sm lg:text-base" style={{ color: '#8E8E93' }}>
-                  Describe tu evento ideal y deja que la IA genere la ruta perfecta con todos los detalles automáticamente.
-                </p>
-              </div>
-            </div>
-          </div>
+    {/* Crear Evento con IA */}
+    <div 
+      className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm opacity-60"
+      style={{ border: '1px solid #E5E5EA' }}
+    >
+      <div className="flex items-start space-x-4">
+        <div 
+          onClick={() => setActiveView('chat')}
+          className="p-3 rounded-xl flex-shrink-0"
+          style={{ backgroundColor: '#8E8E93' }}
+        >
+          <Sparkles className="h-6 w-6" style={{ color: '#FFFFFF' }} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
+            Crear Evento con IA
+            <span className="ml-2 text-xs font-normal px-2 py-1 rounded-full" style={{ backgroundColor: '#FF9500', color: '#FFFFFF' }}>
+              Próximamente
+            </span>
+          </h3>
+          <p className="text-sm lg:text-base" style={{ color: '#8E8E93' }}>
+            Describe tu evento ideal y deja que la IA genere la ruta perfecta con todos los detalles automáticamente.
+          </p>
         </div>
       </div>
+    </div>
+
+  </div>
+</div>
+
     </>
   );
 }
