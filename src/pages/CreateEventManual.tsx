@@ -77,7 +77,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [fileBanner, setFileBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string>('');
 
   const [eventData, setEventData] = useState({
@@ -214,7 +214,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
         return;
       }
 
-      setBannerFile(file);
+      setFileBanner(file);
       
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -324,12 +324,9 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
       formData.append('privado', eventData.privado.toString());
       
       // Solo agregar banner si existe un archivo
-      if (bannerFile) {
-        formData.append('banner', bannerFile);
-        console.log('📷 Banner incluido:', bannerFile.name);
-      } else {
-        // Si no hay banner, enviar string vacío o no enviar el campo
-        formData.append('url_banner', '');
+      if (fileBanner) {
+        formData.append('file_banner', fileBanner);
+        console.log('📷 Banner incluido:', fileBanner.name);
       }
       
       formData.append('ruta', JSON.stringify({
@@ -356,7 +353,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
         estatus: eventData.estatus,
         privado: eventData.privado,
         ruta_puntos: route.length,
-        tiene_banner: !!bannerFile,
+        tiene_banner: !!fileBanner,
       });
 
       const response = await fetch('https://jalatealciclismo.ddns.net/event/v1/create', {
@@ -557,7 +554,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
                 {bannerPreview ? (
                   <div className="relative">
                     <img src={bannerPreview} alt="Preview" className="w-full h-32 object-cover rounded-lg mb-2" />
-                    <button onClick={() => { setBannerFile(null); setBannerPreview(''); }} className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Eliminar</button>
+                    <button onClick={() => { setFileBanner(null); setBannerPreview(''); }} className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Eliminar</button>
                   </div>
                 ) : (
                   <>
