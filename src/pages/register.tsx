@@ -10,6 +10,8 @@ interface UserData {
   email: string;
   password: string;
   name?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string;
 }
 
 interface RegisterProps {
@@ -18,12 +20,29 @@ interface RegisterProps {
 }
 
 export function Register({ onRegisterSuccess, onNavigate }: RegisterProps) {
-  const [name, setName] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [apellidoPaterno, setApellidoPaterno] = useState('');
+  const [apellidoMaterno, setApellidoMaterno] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      // Crear preview de la imagen
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validations
@@ -37,35 +56,91 @@ export function Register({ onRegisterSuccess, onNavigate }: RegisterProps) {
       return;
     }
 
-    // Get existing users
-    const usersData = localStorage.getItem('users');
-    const users: UserData[] = usersData ? JSON.parse(usersData) : [];
-
-    // Check if email already exists
-    if (users.some((u) => u.email === email)) {
-      toast.error('Este email ya está registrado');
-      return;
+    // Preparar datos para enviar como FormData
+    const formData = new FormData();
+    formData.append('nombre', nombre.trim());
+    formData.append('apellido_paterno', apellidoPaterno.trim());
+    formData.append('apellido_materno', apellidoMaterno.trim());
+    formData.append('correo', email.trim());
+    formData.append('contrasena', password);
+    
+    // Si hay foto, agregarla
+    if (photoFile) {
+      formData.append('file', photoFile);
     }
 
-    // Add new user
-    const newUser: UserData = {
-      name: name,
-      email: email,
-      password: password,
-    };
+    console.log('Datos a enviar:', {
+      nombre: nombre.trim(),
+      apellido_paterno: apellidoPaterno.trim(),
+      apellido_materno: apellidoMaterno.trim(),
+      correo: email.trim(),
+      contrasena: password,
+      tiene_foto: !!photoFile,
+    });
 
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    localStorage.setItem('currentUser', newUser.email);
-    onRegisterSuccess(newUser.email);
-    toast.success(`¡Cuenta creada exitosamente! Bienvenido, ${name}!`);
-    
-    // Clear form
-    setName('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    onNavigate('home');
+    try {
+      // Llamada a la API
+      const response = await fetch('https://jalatealciclismo.ddns.net/auth/v1/register', {
+        method: 'POST',
+        body: formData, // NO incluir Content-Type, el navegador lo configura automáticamente
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Manejar errores de validación (422)
+        if (response.status === 422) {
+          console.error('Error de validación completo:', JSON.stringify(data, null, 2));
+          // Extraer el primer mensaje de error si existe
+          if (data.detail && Array.isArray(data.detail) && data.detail.length > 0) {
+            // Mostrar todos los errores de validación
+            data.detail.forEach((error: any, index: number) => {
+              console.log(`Error ${index + 1}:`, error);
+              const fieldName = error.loc ? error.loc.join(' > ') : 'campo';
+              console.log(`  Campo: ${fieldName}`);
+              console.log(`  Mensaje: ${error.msg}`);
+              console.log(`  Tipo: ${error.type}`);
+            });
+            
+            const firstError = data.detail[0];
+            const fieldName = firstError.loc ? firstError.loc.join(' > ') : 'campo';
+            toast.error(`Error en ${fieldName}: ${firstError.msg}`);
+          } else if (typeof data.detail === 'string') {
+            toast.error(data.detail);
+          } else {
+            toast.error('Error de validación en los datos enviados');
+          }
+        } else {
+          // Otros errores del servidor
+          toast.error(typeof data.detail === 'string' ? data.detail : 'Error al crear la cuenta');
+        }
+        return;
+      }
+
+      // Registro exitoso
+      toast.success(`¡Cuenta creada exitosamente! Bienvenido, ${name}!`);
+      
+      // Clear form
+      setNombre('');
+      setApellidoPaterno('');
+      setApellidoMaterno('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setPhotoFile(null);
+      setPhotoPreview('');
+      
+      // Llamar a onRegisterSuccess si existe
+      if (onRegisterSuccess && typeof onRegisterSuccess === 'function') {
+        onRegisterSuccess(email);
+      }
+      
+      // Redirigir al login
+      onNavigate('login');
+    } catch (error) {
+      console.error('Error al registrar usuario:', error);
+      toast.error('Error de conexión. Por favor, intenta de nuevo.');
+    }
   };
 
   return (
@@ -103,8 +178,48 @@ export function Register({ onRegisterSuccess, onNavigate }: RegisterProps) {
                 id="name"
                 type="text"
                 placeholder="Tu nombre"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={ nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apellidopaterno" style={{ color: '#1C1C1E' }}>
+                Apellido Paterno
+              </Label>
+              <Input
+                id="apellidopaterno"
+                type="text"
+                placeholder="Apellido Paterno"
+                value={apellidoPaterno}
+                onChange={(e) => setApellidoPaterno(e.target.value)}
+                required
+                className="h-12 rounded-xl border-2"
+                style={{ 
+                  borderColor: '#E5E5EA',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1C1C1E'
+                }}
+              />
+            </div>
+
+              <div className="space-y-2">
+              <Label htmlFor="apellidomaterno" style={{ color: '#1C1C1E' }}>
+                Apellido Materno
+              </Label>
+              <Input
+                id="apellidomaterno"
+                type="text"
+                placeholder="Apellido Materno"
+                value={apellidoMaterno}
+                onChange={(e) => setApellidoMaterno(e.target.value)}
                 required
                 className="h-12 rounded-xl border-2"
                 style={{ 

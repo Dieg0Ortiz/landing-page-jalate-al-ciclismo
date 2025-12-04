@@ -5,43 +5,78 @@ import { Label } from '../components/ui/label';
 import { ImageWithFallback } from '../components/utils/ImageWithFallback';
 import { LogIn, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface UserData {
-  email: string;
-  password: string;
-  name?: string;
-}
+import { useAuth } from './AuthContext';
 
 interface LoginProps {
-  onLoginSuccess: (email: string) => void;
   onNavigate: (page: string) => void;
 }
 
-export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
+export function Login({ onNavigate }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    // Get users from localStorage
-    const usersData = localStorage.getItem('users');
-    const users: UserData[] = usersData ? JSON.parse(usersData) : [];
+    // Preparar datos para enviar como FormData
+    const formData = new FormData();
+    formData.append('correo', email.trim());
+    formData.append('contrasena', password);
 
-    // Find user
-    const user = users.find(
-      (u) => u.email === email && u.password === password
-    );
+    console.log('Intentando login con:', email);
 
-    if (user) {
-      localStorage.setItem('currentUser', user.email);
-      onLoginSuccess(user.email);
-      toast.success(`¡Bienvenido de nuevo, ${user.name || user.email}!`);
+    try {
+      // Llamada a la API
+      const response = await fetch('https://jalatealciclismo.ddns.net/auth/v1/login', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Manejar errores del servidor
+        if (response.status === 401 || response.status === 404) {
+          toast.error('Email o contraseña incorrectos');
+        } else if (response.status === 422) {
+          console.error('Error de validación:', data);
+          toast.error('Error en los datos enviados');
+        } else {
+          toast.error(data.detail || 'Error al iniciar sesión');
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Login exitoso
+      console.log('Login exitoso:', data);
+      
+      // ⭐ IMPORTANTE: Guardar token con el nombre correcto
+      if (data.access_token) {
+        // Guardar con ambos nombres para compatibilidad
+        localStorage.setItem('authToken', data.access_token);
+        localStorage.setItem('access_token', data.access_token);
+        console.log('✅ Token guardado en localStorage como authToken y access_token');
+      }
+      
+      // Llamar a la función login del contexto
+      login(email, password);
+      
+      // Notificar éxito
+      toast.success(`¡Bienvenido de nuevo!`);
+      
+      // Limpiar formulario
       setEmail('');
       setPassword('');
-      onNavigate('home');
-    } else {
-      toast.error('Email o contraseña incorrectos');
+      
+    } catch (error) {
+      console.error('Error al iniciar sesión:', error);
+      toast.error('Error de conexión. Por favor, intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -78,6 +113,7 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
             onClick={() => onNavigate('home')}
             className="flex items-center gap-2 mb-8 transition-opacity hover:opacity-70"
             style={{ color: '#8E8E93' }}
+            disabled={isLoading}
           >
             <ArrowLeft className="h-5 w-5" />
             Volver al inicio
@@ -106,6 +142,7 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
                 className="h-12 rounded-xl border-2"
                 style={{ 
                   borderColor: '#E5E5EA',
@@ -126,6 +163,7 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
                 className="h-12 rounded-xl border-2"
                 style={{ 
                   borderColor: '#E5E5EA',
@@ -137,14 +175,16 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
 
             <Button
               type="submit"
+              disabled={isLoading}
               className="w-full h-12 rounded-xl"
               style={{ 
-                backgroundColor: '#1C1C1E',
-                color: '#FFFFFF'
+                backgroundColor: isLoading ? '#8E8E93' : '#1C1C1E',
+                color: '#FFFFFF',
+                opacity: isLoading ? 0.7 : 1,
               }}
             >
               <LogIn className="mr-2 h-5 w-5" />
-              Iniciar Sesión
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
 
@@ -156,6 +196,7 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
                 onClick={() => onNavigate('register')}
                 className="transition-opacity hover:opacity-70"
                 style={{ color: '#007AFF' }}
+                disabled={isLoading}
               >
                 Regístrate aquí
               </button>

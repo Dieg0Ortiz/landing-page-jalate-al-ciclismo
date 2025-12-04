@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './pages/AuthContext';
 import { Navbar } from './components/Navbar';
+import { Toaster } from './components/ui/sonner';
+
+import { AuthProvider, useAuth } from './pages/AuthContext';
 import { HomePage } from './pages/Home';
 import { Login } from './pages/login';
 import { Register } from './pages/register';
 import { ForgotPassword } from './pages/recu_contrasena';
-import { Dashboard } from './pages/daschboard';
-import { Toaster } from './components/ui/sonner';
+import  Dashboard  from './pages/dashboard';
+import { PlanRoute } from './pages/plan_rute';
+import { RecordActivity } from './pages/EventsView';
+import { Activities } from './pages/Activities';
+
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -46,6 +51,12 @@ function AppContent() {
         return <ForgotPassword onNavigate={setCurrentPage} />;
       case 'dashboard':
         return <Dashboard onNavigate={setCurrentPage} />;
+      case 'plan-route':
+        return <PlanRoute />;
+      case 'record-activity':
+        return <RecordActivity />;
+      case 'activities':
+        return <Activities />;
       default:
         return (
           <>
