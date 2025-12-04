@@ -54,12 +54,15 @@ export function Login({ onNavigate }: LoginProps) {
       // Login exitoso
       console.log('Login exitoso:', data);
       
-      // Guardar token
+      // ⭐ IMPORTANTE: Guardar token con el nombre correcto
       if (data.access_token) {
+        // Guardar con ambos nombres para compatibilidad
+        localStorage.setItem('authToken', data.access_token);
         localStorage.setItem('access_token', data.access_token);
+        console.log('✅ Token guardado en localStorage como authToken y access_token');
       }
       
-      // IMPORTANTE: Llamar a la función login del contexto para actualizar el estado de autenticación
+      // Llamar a la función login del contexto
       login(email, password);
       
       // Notificar éxito
@@ -68,9 +71,6 @@ export function Login({ onNavigate }: LoginProps) {
       // Limpiar formulario
       setEmail('');
       setPassword('');
-      
-      // La navegación se manejará automáticamente por el useEffect en App.tsx
-      // cuando isAuthenticated cambie a true
       
     } catch (error) {
       console.error('Error al iniciar sesión:', error);

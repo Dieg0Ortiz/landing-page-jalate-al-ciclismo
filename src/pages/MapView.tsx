@@ -1,7 +1,7 @@
 /// <reference types="google.maps" />
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Polyline, Marker } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, DirectionsRenderer } from '@react-google-maps/api';
 import { Button } from '../components/ui/button';
 import {
   Save,
@@ -21,7 +21,7 @@ const containerStyle = {
 };
 
 const center = {
-  lat: 16.7516, // Coordenadas de Tuxtla Gutiérrez, Chiapas
+  lat: 16.7516,
   lng: -93.1029,
 };
 
@@ -30,20 +30,90 @@ interface MapViewProps {
   generatedRoute?: RouteData | null;
 }
 
+// Estructura de datos para guardar la ruta completa
+interface SavedRoute {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  // Puntos de la ruta (waypoints)
+  waypoints: {
+    lat: number;
+    lng: number;
+    order: number; // Orden del punto en la ruta
+  }[];
+  // Metadatos de la ruta
+  metadata: {
+    distance: number; // en kilómetros
+    duration: number; // en minutos
+    travelMode: 'BICYCLING' | 'DRIVING' | 'WALKING';
+  };
+  // Opcional: Guardar la ruta completa con todos los puntos de Google
+  encodedPolyline?: string; // Polyline codificado de Google Maps
+}
+
 export default function MapView({ setActiveView, generatedRoute }: MapViewProps) {
   const [route, setRoute] = useState<google.maps.LatLngLiteral[]>([]);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'terrain'>('roadmap');
   const [distance, setDistance] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [showInfo, setShowInfo] = useState(false);
   const [routeName, setRouteName] = useState<string>('');
+  const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const isUpdatingFromDrag = useRef(false);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: 'AIzaSyDEH8aKGH5WtDunUAyyBs_XrggHi2kd6Hc',
   });
 
-  // Cargar ruta generada por IA
+  const calculateRoute = useCallback(async (points: google.maps.LatLngLiteral[]) => {
+    if (points.length < 2 || !window.google) return;
+
+    setIsCalculatingRoute(true);
+
+    const directionsService = new google.maps.DirectionsService();
+    
+    const origin = points[0];
+    const destination = points[points.length - 1];
+    const waypoints = points.slice(1, -1).map(point => ({
+      location: new google.maps.LatLng(point.lat, point.lng),
+      stopover: true,
+    }));
+
+    try {
+      const result = await directionsService.route({
+        origin: new google.maps.LatLng(origin.lat, origin.lng),
+        destination: new google.maps.LatLng(destination.lat, destination.lng),
+        waypoints: waypoints,
+        travelMode: google.maps.TravelMode.BICYCLING,
+        optimizeWaypoints: false,
+      });
+
+      setDirectionsResponse(result);
+
+      let totalDistance = 0;
+      let totalDuration = 0;
+      
+      result.routes[0].legs.forEach(leg => {
+        if (leg.distance) totalDistance += leg.distance.value;
+        if (leg.duration) totalDuration += leg.duration.value;
+      });
+
+      setDistance(totalDistance / 1000);
+      setDuration(totalDuration / 60);
+
+    } catch (error) {
+      console.error('Error calculando ruta:', error);
+      alert('No se pudo calcular la ruta. Intenta con otros puntos.');
+    } finally {
+      setIsCalculatingRoute(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (generatedRoute) {
       const aiRoute: google.maps.LatLngLiteral[] = [
@@ -54,24 +124,29 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
 
       setRoute(aiRoute);
       setRouteName(generatedRoute.name);
+      calculateRoute(aiRoute);
 
-      // Calcular distancia
-      if (aiRoute.length > 1) {
-        let totalDistance = 0;
-        for (let i = 0; i < aiRoute.length - 1; i++) {
-          totalDistance += calculateDistance(aiRoute[i], aiRoute[i + 1]);
-        }
-        setDistance(totalDistance);
-      }
-
-      // Centrar el mapa en la ruta
       if (mapRef.current && aiRoute.length > 0) {
         const bounds = new google.maps.LatLngBounds();
         aiRoute.forEach((point) => bounds.extend(point));
         mapRef.current.fitBounds(bounds);
       }
     }
-  }, [generatedRoute]);
+  }, [generatedRoute, calculateRoute]);
+
+  useEffect(() => {
+    if (isUpdatingFromDrag.current) {
+      return;
+    }
+
+    if (route.length >= 2) {
+      calculateRoute(route);
+    } else {
+      setDirectionsResponse(null);
+      setDistance(0);
+      setDuration(0);
+    }
+  }, [route, calculateRoute]);
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
@@ -89,72 +164,156 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
           lng: e.latLng.lng(),
         };
         
-        const newRoute = [...route, newPoint];
-        setRoute(newRoute);
-
-        // Calcular distancia total
-        if (newRoute.length > 1) {
-          let totalDistance = 0;
-          for (let i = 0; i < newRoute.length - 1; i++) {
-            totalDistance += calculateDistance(newRoute[i], newRoute[i + 1]);
-          }
-          setDistance(totalDistance);
-        }
+        isUpdatingFromDrag.current = false;
+        setRoute(prev => [...prev, newPoint]);
       }
     },
-    [route]
+    []
   );
-
-  const calculateDistance = (
-    point1: google.maps.LatLngLiteral,
-    point2: google.maps.LatLngLiteral
-  ): number => {
-    const R = 6371; // Radio de la Tierra en km
-    const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
-    const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((point1.lat * Math.PI) / 180) *
-        Math.cos((point2.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
 
   const handleClearRoute = () => {
     setRoute([]);
     setDistance(0);
+    setDuration(0);
     setRouteName('');
+    setDirectionsResponse(null);
+    isUpdatingFromDrag.current = false;
   };
 
   const handleUndoLastPoint = () => {
     if (route.length > 0) {
-      const newRoute = route.slice(0, -1);
-      setRoute(newRoute);
-      
-      // Recalcular distancia
-      if (newRoute.length > 1) {
-        let totalDistance = 0;
-        for (let i = 0; i < newRoute.length - 1; i++) {
-          totalDistance += calculateDistance(newRoute[i], newRoute[i + 1]);
-        }
-        setDistance(totalDistance);
-      } else {
-        setDistance(0);
-      }
+      isUpdatingFromDrag.current = false;
+      setRoute(prev => prev.slice(0, -1));
     }
   };
 
-  const handleSaveRoute = () => {
+  // 📦 FUNCIÓN PARA PREPARAR LOS DATOS DE LA RUTA PARA GUARDAR
+  const prepareRouteForSaving = (): SavedRoute => {
+    const routeId = `route_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const savedRoute: SavedRoute = {
+      id: routeId,
+      name: routeName || `Ruta ${new Date().toLocaleDateString()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      waypoints: route.map((point, index) => ({
+        lat: point.lat,
+        lng: point.lng,
+        order: index,
+      })),
+      metadata: {
+        distance: distance,
+        duration: duration,
+        travelMode: 'BICYCLING',
+      },
+    };
+
+    // Opcional: Guardar el polyline codificado de Google
+    if (directionsResponse && directionsResponse.routes[0]) {
+      savedRoute.encodedPolyline = directionsResponse.routes[0].overview_polyline;
+    }
+
+    return savedRoute;
+  };
+
+  // 💾 FUNCIÓN PARA GUARDAR LA RUTA (Backend/LocalStorage/Firebase)
+  const handleSaveRoute = async () => {
     if (route.length < 2) {
       alert('Necesitas al menos 2 puntos para guardar una ruta');
       return;
     }
     
-    // Aquí implementarías la lógica para guardar la ruta
-    console.log('Guardando ruta:', { route, distance, name: routeName });
-    alert(`Ruta guardada: ${distance.toFixed(2)} km con ${route.length} puntos${routeName ? ` - ${routeName}` : ''}`);
+    const savedRoute = prepareRouteForSaving();
+    
+    console.log('📍 Ruta preparada para guardar:', savedRoute);
+    console.log('📄 JSON para enviar al backend:', JSON.stringify(savedRoute, null, 2));
+
+    try {
+      // OPCIÓN 1: Guardar en LocalStorage (para pruebas)
+      localStorage.setItem(`route_${savedRoute.id}`, JSON.stringify(savedRoute));
+      
+      // OPCIÓN 2: Guardar en tu backend (descomenta cuando tengas el endpoint)
+      /*
+      const response = await fetch('/api/routes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(savedRoute),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Error al guardar la ruta');
+      }
+      
+      const result = await response.json();
+      console.log('Ruta guardada exitosamente:', result);
+      */
+      
+      alert(`✅ Ruta guardada exitosamente!\n\n` +
+            `📍 ID: ${savedRoute.id}\n` +
+            `📏 Distancia: ${distance.toFixed(2)} km\n` +
+            `⏱️ Tiempo: ~${Math.round(duration)} min\n` +
+            `🎯 Puntos: ${route.length}\n` +
+            `📱 Esta ruta puede ser cargada en el móvil usando el ID`);
+      
+    } catch (error) {
+      console.error('Error guardando la ruta:', error);
+      alert('❌ Error al guardar la ruta. Revisa la consola.');
+    }
+  };
+
+  // 🔄 FUNCIÓN PARA CARGAR UNA RUTA GUARDADA
+  const loadSavedRoute = (savedRoute: SavedRoute) => {
+    console.log('🔄 Cargando ruta guardada:', savedRoute);
+    
+    // Reconstruir los puntos de la ruta
+    const loadedRoute = savedRoute.waypoints
+      .sort((a, b) => a.order - b.order)
+      .map(wp => ({ lat: wp.lat, lng: wp.lng }));
+    
+    setRoute(loadedRoute);
+    setRouteName(savedRoute.name);
+    setDistance(savedRoute.metadata.distance);
+    setDuration(savedRoute.metadata.duration);
+    
+    // Recalcular la ruta con Google Maps
+    calculateRoute(loadedRoute);
+    
+    // Centrar el mapa
+    if (mapRef.current && loadedRoute.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      loadedRoute.forEach((point) => bounds.extend(point));
+      mapRef.current.fitBounds(bounds);
+    }
+  };
+
+  // 🔍 FUNCIÓN PARA CARGAR RUTA POR ID (para usar desde móvil)
+  const loadRouteById = async (routeId: string) => {
+    try {
+      // OPCIÓN 1: Cargar desde LocalStorage
+      const savedRouteStr = localStorage.getItem(`route_${routeId}`);
+      if (savedRouteStr) {
+        const savedRoute: SavedRoute = JSON.parse(savedRouteStr);
+        loadSavedRoute(savedRoute);
+        return;
+      }
+      
+      // OPCIÓN 2: Cargar desde backend
+      /*
+      const response = await fetch(`/api/routes/${routeId}`);
+      if (!response.ok) {
+        throw new Error('Ruta no encontrada');
+      }
+      
+      const savedRoute: SavedRoute = await response.json();
+      loadSavedRoute(savedRoute);
+      */
+      
+    } catch (error) {
+      console.error('Error cargando la ruta:', error);
+      alert('❌ No se pudo cargar la ruta');
+    }
   };
 
   const handleCenterMap = () => {
@@ -167,6 +326,82 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
       mapRef.current.setZoom(13);
     }
   };
+
+  const onDirectionsRendererLoad = useCallback((directionsRenderer: google.maps.DirectionsRenderer) => {
+    directionsRendererRef.current = directionsRenderer;
+    
+    directionsRenderer.setOptions({
+      draggable: true,
+      suppressMarkers: false,
+      polylineOptions: {
+        strokeColor: '#007AFF',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+      },
+      markerOptions: {
+        draggable: true,
+      }
+    });
+
+    directionsRenderer.addListener('directions_changed', () => {
+      const directions = directionsRenderer.getDirections();
+      if (directions && directions.routes && directions.routes[0]) {
+        isUpdatingFromDrag.current = true;
+        
+        const legs = directions.routes[0].legs;
+        const newRoute: google.maps.LatLngLiteral[] = [];
+        
+        if (legs.length > 0) {
+          newRoute.push({
+            lat: legs[0].start_location.lat(),
+            lng: legs[0].start_location.lng(),
+          });
+        }
+
+        legs.forEach((leg, index) => {
+          if (index < legs.length - 1) {
+            newRoute.push({
+              lat: leg.end_location.lat(),
+              lng: leg.end_location.lng(),
+            });
+          }
+        });
+
+        if (legs.length > 0) {
+          const lastLeg = legs[legs.length - 1];
+          newRoute.push({
+            lat: lastLeg.end_location.lat(),
+            lng: lastLeg.end_location.lng(),
+          });
+        }
+
+        const pointsChanged = newRoute.length !== route.length || 
+          newRoute.some((point, idx) => 
+            Math.abs(point.lat - route[idx]?.lat) > 0.00001 || 
+            Math.abs(point.lng - route[idx]?.lng) > 0.00001
+          );
+
+        if (pointsChanged) {
+          setRoute(newRoute);
+
+          let totalDistance = 0;
+          let totalDuration = 0;
+          
+          legs.forEach(leg => {
+            if (leg.distance) totalDistance += leg.distance.value;
+            if (leg.duration) totalDuration += leg.duration.value;
+          });
+
+          setDistance(totalDistance / 1000);
+          setDuration(totalDuration / 60);
+        }
+
+        setTimeout(() => {
+          isUpdatingFromDrag.current = false;
+        }, 500);
+      }
+    });
+  }, [route]);
 
   if (!isLoaded) {
     return (
@@ -192,7 +427,9 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
                 {routeName || 'Crear Ruta - Tuxtla Gutiérrez'}
               </h1>
               <p className="text-xs" style={{ color: '#8E8E93' }}>
-                {routeName ? 'Ruta generada por IA' : 'Haz clic en el mapa para trazar tu ruta'}
+                {directionsResponse 
+                  ? 'Arrastra los marcadores para modificar la ruta' 
+                  : 'Haz clic en el mapa para trazar tu ruta ciclista'}
               </p>
             </div>
             <Button
@@ -223,44 +460,36 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
             zoomControl: true,
           }}
         >
-          {/* Dibujar la ruta */}
-          {route.length > 1 && (
-            <Polyline
-              path={route}
+          {directionsResponse && (
+            <DirectionsRenderer
+              directions={directionsResponse}
+              onLoad={onDirectionsRendererLoad}
               options={{
-                strokeColor: '#007AFF',
-                strokeOpacity: 0.8,
-                strokeWeight: 4,
+                draggable: true,
+                suppressMarkers: false,
+                polylineOptions: {
+                  strokeColor: '#007AFF',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 5,
+                },
               }}
             />
           )}
-
-          {/* Marcadores para cada punto */}
-          {route.map((point, index) => (
-            <Marker
-              key={index}
-              position={point}
-              label={{
-                text: `${index + 1}`,
-                color: '#FFFFFF',
-                fontSize: '12px',
-                fontWeight: 'bold',
-              }}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                fillColor: index === 0 ? '#34C759' : index === route.length - 1 ? '#FF3B30' : '#007AFF',
-                fillOpacity: 1,
-                strokeColor: '#FFFFFF',
-                strokeWeight: 2,
-                scale: 8,
-              }}
-            />
-          ))}
         </GoogleMap>
 
-        {/* Control Panel - Desktop (derecha arriba) */}
+        {isCalculatingRoute && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+            <div className="bg-white rounded-lg shadow-lg p-4" style={{ border: '1px solid #E5E5EA' }}>
+              <Navigation className="h-8 w-8 mx-auto mb-2 animate-spin" style={{ color: '#007AFF' }} />
+              <p className="text-sm font-medium" style={{ color: '#1C1C1E' }}>
+                Calculando ruta ciclista...
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Control Panel - Desktop */}
         <div className="hidden lg:block absolute top-4 right-4 space-y-2 z-20">
-          {/* Map Type Selector */}
           <div className="bg-white rounded-lg shadow-lg p-1.5" style={{ border: '1px solid #E5E5EA' }}>
             <button
               onClick={() => setMapType('roadmap')}
@@ -294,7 +523,6 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
             </button>
           </div>
 
-          {/* Action Buttons */}
           <div className="bg-white rounded-lg shadow-lg p-1.5" style={{ border: '1px solid #E5E5EA' }}>
             <button
               onClick={handleCenterMap}
@@ -315,12 +543,12 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
           </div>
         </div>
 
-        {/* Stats Panel - Compacto en esquina inferior izquierda */}
-        <div className="absolute bottom-16 left-4 z-20 w-48">
+        {/* Stats Panel */}
+        <div className="absolute bottom-16 left-4 z-20 w-56">
           <div className="bg-white rounded-lg shadow-lg p-3" style={{ border: '1px solid #E5E5EA' }}>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-xs" style={{ color: '#1C1C1E' }}>
-                Info de Ruta
+                Info de Ruta Ciclista
               </h3>
               <MapPin className="h-3.5 w-3.5" style={{ color: '#007AFF' }} />
             </div>
@@ -330,6 +558,12 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
                 <span className="text-xs" style={{ color: '#8E8E93' }}>Distancia</span>
                 <span className="font-bold text-xs" style={{ color: '#1C1C1E' }}>
                   {distance.toFixed(2)} km
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs" style={{ color: '#8E8E93' }}>Tiempo est.</span>
+                <span className="font-bold text-xs" style={{ color: '#1C1C1E' }}>
+                  ~{Math.round(duration)} min
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -343,7 +577,9 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
             {showInfo && (
               <div className="mt-2 pt-2" style={{ borderTop: '1px solid #E5E5EA' }}>
                 <p className="text-xs leading-relaxed" style={{ color: '#8E8E93' }}>
-                  💡 Clic en el mapa para agregar puntos
+                  💡 Clic en el mapa para agregar puntos<br/>
+                  🖱️ Arrastra los marcadores para modificar<br/>
+                  🚴 Ruta optimizada para ciclistas
                 </p>
               </div>
             )}
@@ -364,14 +600,10 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
         </div>
       </div>
 
-      {/* Bottom Action Bar - Barra fija en la parte inferior */}
-      <div
-        className="bg-white shadow-lg z-30"
-        style={{ borderTop: '1px solid #E5E5EA' }}
-      >
+      {/* Bottom Action Bar */}
+      <div className="bg-white shadow-lg z-30" style={{ borderTop: '1px solid #E5E5EA' }}>
         <div className="px-4 py-2.5">
           <div className="flex items-center justify-center gap-2 max-w-2xl mx-auto">
-            {/* Botón Deshacer */}
             <button
               onClick={handleUndoLastPoint}
               disabled={route.length === 0}
@@ -386,7 +618,6 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
               <span className="hidden sm:inline">Deshacer</span>
             </button>
             
-            {/* Botón Limpiar */}
             <button
               onClick={handleClearRoute}
               disabled={route.length === 0}
@@ -401,7 +632,6 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
               <span className="hidden sm:inline">Limpiar</span>
             </button>
 
-            {/* Botón Guardar - Más prominente */}
             <button
               onClick={handleSaveRoute}
               disabled={route.length < 2}
@@ -421,3 +651,6 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
     </div>
   );
 }
+
+// 📱 EXPORTAR FUNCIONES ÚTILES PARA USO EN MÓVIL
+export type { SavedRoute };
