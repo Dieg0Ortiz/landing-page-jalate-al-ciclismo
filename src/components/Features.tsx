@@ -29,7 +29,7 @@ export function Features() {
               style={{ backgroundColor: '#FFFFFF', border: '6px solid #1C1C1E' }}
             >
               <ImageWithFallback
-                src="/src/images/COPILOTO IA.png"
+                src="/images/COPILOTO IA.png"
                 alt="Pantalla COPILOTO IA de Jalate al Ciclismo"
                 className="w-full h-full object-cover"
               />
@@ -46,7 +46,7 @@ export function Features() {
               style={{ backgroundColor: '#FFFFFF', border: '6px solid #1C1C1E' }}
             >
               <ImageWithFallback
-                src="/src/images/NAVEGACION.png"
+                src="/images/NAVEGACION.png"
                 alt="Pantalla NAVEGACION de Jalate al Ciclismo"
                 className="w-full h-full object-cover"
               />
@@ -93,7 +93,7 @@ export function Features() {
               style={{ backgroundColor: '#FFFFFF', border: '6px solid #1C1C1E' }}
             >
               <ImageWithFallback
-                src="/src/images/ANALISIS.png"
+                src="/images/ANALISIS.png"
                 alt="Pantalla ANÁLISIS de Jalate al Ciclismo"
                 className="w-full h-full object-cover"
               />

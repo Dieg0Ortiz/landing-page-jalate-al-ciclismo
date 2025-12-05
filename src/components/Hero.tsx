@@ -1,6 +1,6 @@
-import { ImageWithFallback } from './utils/ImageWithFallback';
-import { Button } from './ui/button';
-import { Zap } from 'lucide-react';
+import { ImageWithFallback } from "./utils/ImageWithFallback";
+import { Button } from "./ui/button";
+import { Zap } from "lucide-react";
 
 // Obtener la función de navegación del contexto del App
 // Si no existe, usar scroll por defecto
@@ -13,9 +13,11 @@ export function Hero() {
   const scrollToBeta = () => {
     const navigate = getNavigateFunction();
     if (navigate) {
-      navigate('register');
+      navigate("register");
     } else {
-      document.getElementById('beta-signup')?.scrollIntoView({ behavior: 'smooth' });
+      document
+        .getElementById("beta-signup")
+        ?.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -35,17 +37,26 @@ export function Hero() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Text Content */}
           <div className="space-y-6">
-            <h1 className="text-[3.5rem] leading-[1.1] tracking-tight" style={{ color: '#1C1C1E' }}>
-              Tu Copiloto de IA para Ciclismo. Deja de planificar, empieza a rodar.
+            <h1
+              className="text-[3.5rem] leading-[1.1] tracking-tight"
+              style={{ color: "#1C1C1E" }}
+            >
+              Tu Copiloto de IA para Ciclismo. Deja de planificar, empieza a
+              rodar.
             </h1>
-            <p className="text-[1.25rem] leading-relaxed" style={{ color: '#8E8E93' }}>
-              Genera rutas inteligentes con tu voz, navega 100% offline y entiende la historia detrás de cada pedaleo. Todo en un solo lugar.
+            <p
+              className="text-[1.25rem] leading-relaxed"
+              style={{ color: "#8E8E93" }}
+            >
+              Genera rutas inteligentes con tu voz, navega 100% offline y
+              entiende la historia detrás de cada pedaleo. Todo en un solo
+              lugar.
             </p>
             <div className="pt-4">
-              <Button 
+              <Button
                 onClick={scrollToBeta}
                 className="px-8 py-6 rounded-xl"
-                style={{ backgroundColor: '#1C1C1E', color: '#FFFFFF' }}
+                style={{ backgroundColor: "#1C1C1E", color: "#FFFFFF" }}
               >
                 <Zap className="mr-2 h-5 w-5" />
                 Únete a la Beta Ahora
@@ -56,13 +67,16 @@ export function Hero() {
           {/* Phone Mockup */}
           <div className="flex justify-center lg:justify-end">
             <div className="relative">
-              <div 
+              <div
                 className="w-[320px] h-[640px] rounded-[3rem] shadow-2xl overflow-hidden"
-                style={{ backgroundColor: '#FFFFFF', border: '8px solid #1C1C1E' }}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  border: "8px solid #1C1C1E",
+                }}
               >
                 {/* Phone Screen - Home Image */}
                 <ImageWithFallback
-                  src="/src/images/HOME.png"
+                  src="/images/HOME.png"
                   alt="Pantalla HOME de Jalate al Ciclismo"
                   className="w-full h-full object-cover"
                 />

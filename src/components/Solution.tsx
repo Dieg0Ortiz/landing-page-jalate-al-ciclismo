@@ -54,7 +54,7 @@ export function Solution() {
               style={{ backgroundColor: '#FFFFFF', border: '6px solid #1C1C1E' }}
             >
               <ImageWithFallback
-                src="/src/images/ACTIVIDADES.png"
+                src="/images/ACTIVIDADES.png"
                 alt="Pantalla ACTIVIDADES de Jalate al Ciclismo"
                 className="w-full h-full object-cover"
               />
