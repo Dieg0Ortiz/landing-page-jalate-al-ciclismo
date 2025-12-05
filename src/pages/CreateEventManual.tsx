@@ -4,7 +4,21 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, DirectionsRenderer } from '@react-google-maps/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { MapPin, ArrowLeft, Navigation, Layers, Maximize2, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
+import { 
+  MapPin, 
+  ArrowLeft, 
+  Navigation, 
+  Layers, 
+  Maximize2, 
+  AlertCircle, 
+  Upload, 
+  Image as ImageIcon,
+  CheckCircle, 
+  X,           
+  Calendar,     
+  Users,        
+  Clock         
+} from 'lucide-react';
 
 const containerStyle = {
   width: '100%',
@@ -22,7 +36,6 @@ interface CreateEventManualProps {
 
 // Función para extraer el ID de usuario del token JWT
 const getUserIdFromToken = (): number | null => {
-  // Buscar token en localStorage (ambos nombres posibles)
   const token = localStorage.getItem('authToken') || 
                 localStorage.getItem('access_token') || 
                 sessionStorage.getItem('authToken') ||
@@ -40,13 +53,11 @@ const getUserIdFromToken = (): number | null => {
   console.log('✅ Token encontrado:', token.substring(0, 20) + '...');
 
   try {
-    // Decodificar el token JWT
     const payload = token.split('.')[1];
     const decodedPayload = JSON.parse(atob(payload));
     
     console.log('📋 Payload decodificado:', decodedPayload);
     
-    // Buscar el ID de usuario en diferentes campos posibles
     const userId = decodedPayload.userId || 
                    decodedPayload.id || 
                    decodedPayload.sub || 
@@ -77,8 +88,12 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [fileBanner, setFileBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string>('');
+
+  // ✅ NUEVOS ESTADOS PARA EL MODAL
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdEventData, setCreatedEventData] = useState<any>(null);
 
   const [eventData, setEventData] = useState({
     nombre: '',
@@ -133,7 +148,6 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
       setDistance(totalDistance / 1000);
       setDuration(totalDuration / 60);
 
-      // Auto-rellenar origen y destino
       if (!eventData.origen_carrera && result.routes[0].legs[0].start_address) {
         setEventData(prev => ({ ...prev, origen_carrera: result.routes[0].legs[0].start_address }));
       }
@@ -214,7 +228,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
         return;
       }
 
-      setBannerFile(file);
+      setFileBanner(file);
       
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -284,7 +298,6 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
     setIsSubmitting(true);
 
     try {
-      // Obtener ID de usuario del token
       const id_usuario = getUserIdFromToken();
       
       if (!id_usuario) {
@@ -295,7 +308,6 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
 
       console.log('👤 ID de usuario obtenido:', id_usuario);
 
-      // Obtener token para la petición
       const token = localStorage.getItem('authToken') || 
                     localStorage.getItem('access_token');
       
@@ -305,7 +317,6 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
         return;
       }
 
-      // Crear FormData
       const formData = new FormData();
       
       formData.append('id_usuario', id_usuario.toString());
@@ -315,21 +326,14 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
       formData.append('origen_carrera', eventData.origen_carrera.trim());
       formData.append('destino_fin_carrera', eventData.destino_fin_carrera.trim());
       formData.append('km', distance.toFixed(2));
-      
-      // Asegurar formato correcto de fecha y hora
-      formData.append('fecha_evento', eventData.fecha_evento); // YYYY-MM-DD
-      formData.append('hora_evento', eventData.hora_evento + ':00'); // HH:MM:SS (agregar segundos)
-      
+      formData.append('fecha_evento', eventData.fecha_evento);
+      formData.append('hora_evento', eventData.hora_evento + ':00');
       formData.append('estatus', eventData.estatus.toString());
       formData.append('privado', eventData.privado.toString());
       
-      // Solo agregar banner si existe un archivo
-      if (bannerFile) {
-        formData.append('banner', bannerFile);
-        console.log('📷 Banner incluido:', bannerFile.name);
-      } else {
-        // Si no hay banner, enviar string vacío o no enviar el campo
-        formData.append('url_banner', '');
+      if (fileBanner) {
+        formData.append('file_banner', fileBanner);
+        console.log('📷 Banner incluido:', fileBanner.name);
       }
       
       formData.append('ruta', JSON.stringify({
@@ -342,22 +346,6 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
       }));
 
       console.log('📤 Enviando evento al backend...');
-      console.log('📋 Datos del formulario:');
-      console.log({
-        id_usuario,
-        nombre: eventData.nombre,
-        descripcion: eventData.descripcion,
-        cantidad_participantes: eventData.cantidad_participantes || '0',
-        origen_carrera: eventData.origen_carrera,
-        destino_fin_carrera: eventData.destino_fin_carrera,
-        km: distance.toFixed(2),
-        fecha_evento: eventData.fecha_evento,
-        hora_evento: eventData.hora_evento + ':00',
-        estatus: eventData.estatus,
-        privado: eventData.privado,
-        ruta_puntos: route.length,
-        tiene_banner: !!bannerFile,
-      });
 
       const response = await fetch('https://jalatealciclismo.ddns.net/event/v1/create', {
         method: 'POST',
@@ -377,12 +365,10 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
           const errorData = await response.json();
           console.error('❌ Error del servidor:', errorData);
           
-          // Extraer mensaje de error más detallado
           if (errorData.detail) {
             if (typeof errorData.detail === 'string') {
               errorMessage = errorData.detail;
             } else if (Array.isArray(errorData.detail)) {
-              // Errores de validación de FastAPI
               errorDetails = errorData.detail.map((err: any) => 
                 `${err.loc ? err.loc.join(' > ') : 'Error'}: ${err.msg}`
               ).join('\n');
@@ -402,16 +388,19 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
       const result = await response.json();
       console.log('✅ Evento creado exitosamente:', result);
       
-      alert(
-        `✅ Evento creado exitosamente!\n\n` +
-        `Nombre: ${eventData.nombre}\n` +
-        `Fecha: ${new Date(eventData.fecha_evento).toLocaleDateString()}\n` +
-        `Distancia: ${distance.toFixed(2)} km\n` +
-        `Puntos de ruta: ${route.length}`
-      );
-      
-      // Volver al dashboard
-      setActiveView('dashboard');
+      // ✅ REEMPLAZAR EL alert() CON ESTO:
+      setCreatedEventData({
+        nombre: eventData.nombre,
+        fecha: eventData.fecha_evento,
+        hora: eventData.hora_evento,
+        distancia: distance.toFixed(2),
+        puntos: route.length,
+        participantes: eventData.cantidad_participantes || 'Sin límite',
+        origen: eventData.origen_carrera,
+        privado: eventData.privado === 1,
+      });
+      setShowSuccessModal(true);
+      // NO llamar setActiveView aquí, el modal lo hará
       
     } catch (error) {
       console.error('❌ Error al crear evento:', error);
@@ -557,7 +546,7 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
                 {bannerPreview ? (
                   <div className="relative">
                     <img src={bannerPreview} alt="Preview" className="w-full h-32 object-cover rounded-lg mb-2" />
-                    <button onClick={() => { setBannerFile(null); setBannerPreview(''); }} className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Eliminar</button>
+                    <button onClick={() => { setFileBanner(null); setBannerPreview(''); }} className="text-xs px-3 py-1 rounded" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Eliminar</button>
                   </div>
                 ) : (
                   <>
@@ -630,6 +619,210 @@ export function CreateEventManual({ setActiveView }: CreateEventManualProps) {
           </div>
         </div>
       </div>
+
+      {/* ✅ MODAL DE ÉXITO - NUEVO */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in"
+            style={{ border: '1px solid #E5E5EA' }}
+          >
+            {/* Header con gradiente azul */}
+            <div 
+              className="p-6 text-center relative"
+              style={{ 
+                background: 'linear-gradient(135deg, #007AFF 0%, #0051D5 100%)',
+              }}
+            >
+              {/* Botón cerrar */}
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setActiveView('dashboard');
+                }}
+                className="absolute top-4 right-4 p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition-all"
+              >
+                <X className="h-5 w-5" style={{ color: '#FFFFFF' }} />
+              </button>
+
+              {/* Icono de éxito */}
+              <div 
+                className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: '#FFFFFF20' }}
+              >
+                <CheckCircle className="h-12 w-12" style={{ color: '#FFFFFF' }} />
+              </div>
+
+              <h2 className="text-2xl font-bold mb-2" style={{ color: '#FFFFFF' }}>
+                ¡Evento Creado!
+              </h2>
+              <p className="text-sm" style={{ color: '#FFFFFF', opacity: 0.9 }}>
+                Tu evento ha sido creado exitosamente
+              </p>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6">
+              {/* Nombre del evento */}
+              <div 
+                className="mb-4 p-4 rounded-xl text-center"
+                style={{ backgroundColor: '#F2F2F7' }}
+              >
+                <p className="text-xs font-medium mb-1" style={{ color: '#8E8E93' }}>
+                  Nombre del Evento
+                </p>
+                <h3 className="text-xl font-bold" style={{ color: '#1C1C1E' }}>
+                  {createdEventData?.nombre}
+                </h3>
+              </div>
+
+              {/* Detalles */}
+              <div className="space-y-3 mb-6">
+                {/* Fecha y hora */}
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="p-2 rounded-lg flex-shrink-0"
+                    style={{ backgroundColor: '#007AFF15' }}
+                  >
+                    <Calendar className="h-5 w-5" style={{ color: '#007AFF' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium" style={{ color: '#8E8E93' }}>
+                      Fecha y Hora
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: '#1C1C1E' }}>
+                      {new Date(createdEventData?.fecha).toLocaleDateString('es-MX', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                    <p className="text-sm" style={{ color: '#1C1C1E' }}>
+                      {createdEventData?.hora}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Origen */}
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="p-2 rounded-lg flex-shrink-0"
+                    style={{ backgroundColor: '#34C75915' }}
+                  >
+                    <MapPin className="h-5 w-5" style={{ color: '#34C759' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium" style={{ color: '#8E8E93' }}>
+                      Punto de Partida
+                    </p>
+                    <p className="text-sm font-semibold line-clamp-2" style={{ color: '#1C1C1E' }}>
+                      {createdEventData?.origen}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Distancia */}
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="p-2 rounded-lg flex-shrink-0"
+                    style={{ backgroundColor: '#FF950015' }}
+                  >
+                    <Navigation className="h-5 w-5" style={{ color: '#FF9500' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium" style={{ color: '#8E8E93' }}>
+                      Distancia de la Ruta
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: '#1C1C1E' }}>
+                      {createdEventData?.distancia} km • {createdEventData?.puntos} puntos
+                    </p>
+                  </div>
+                </div>
+
+                {/* Participantes */}
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="p-2 rounded-lg flex-shrink-0"
+                    style={{ backgroundColor: '#8E8E9315' }}
+                  >
+                    <Users className="h-5 w-5" style={{ color: '#8E8E93' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium" style={{ color: '#8E8E93' }}>
+                      Participantes
+                    </p>
+                    <p className="text-sm font-semibold" style={{ color: '#1C1C1E' }}>
+                      {createdEventData?.participantes} máximo
+                    </p>
+                  </div>
+                </div>
+
+                {/* Badge privado/público */}
+                <div className="flex items-center justify-center pt-2">
+                  <span 
+                    className="text-xs font-medium px-3 py-1.5 rounded-full"
+                    style={{
+                      backgroundColor: createdEventData?.privado ? '#FF3B3020' : '#34C75920',
+                      color: createdEventData?.privado ? '#FF3B30' : '#34C759'
+                    }}
+                  >
+                    {createdEventData?.privado ? '🔒 Evento Privado' : '🌐 Evento Público'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setActiveView('dashboard');
+                  }}
+                  className="w-full py-3 rounded-xl font-semibold transition-all hover:opacity-90"
+                  style={{ 
+                    backgroundColor: '#007AFF', 
+                    color: '#FFFFFF' 
+                  }}
+                >
+                  Ver Mis Eventos
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    // Limpiar formulario
+                    setEventData({
+                      nombre: '',
+                      descripcion: '',
+                      cantidad_participantes: '',
+                      origen_carrera: '',
+                      destino_fin_carrera: '',
+                      fecha_evento: '',
+                      hora_evento: '',
+                      privado: 0,
+                      estatus: 1,
+                    });
+                    setRoute([]);
+                    setDistance(0);
+                    setDuration(0);
+                    setDirectionsResponse(null);
+                    setFileBanner(null);
+                    setBannerPreview('');
+                  }}
+                  className="w-full py-3 rounded-xl font-semibold transition-all hover:bg-gray-100"
+                  style={{ 
+                    backgroundColor: '#F2F2F7', 
+                    color: '#007AFF' 
+                  }}
+                >
+                  Crear Otro Evento
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

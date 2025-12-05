@@ -23,8 +23,8 @@ export interface RouteAIResponse {
 }
 
 // IMPORTANTE: En producción, usa variables de entorno
-const GEMINI_API_KEY = 'AIzaSyDwneyWSJbD2pe1EulEplU-FGVu-FCtNpQ';
-
+//const GEMINI_API_KEY = 'AIzaSyDwneyWSJbD2pe1EulEplU-FGVu-FCtNpQ';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const LIST_MODELS_URL = 'https://generativelanguage.googleapis.com/v1/models';
 
 // Prompt estricto: obliga al modelo a solo devolver JSON válido en el formato pedido.

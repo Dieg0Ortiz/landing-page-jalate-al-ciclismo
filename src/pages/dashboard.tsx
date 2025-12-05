@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import {
@@ -24,14 +24,34 @@ import { CreateEventManual } from './CreateEventManual'
 import { CreateRouteManual } from './CreateRouteManual'
 import MapView from './MapView';
 import IAChat from './IAChat';
+import { RouteData } from './routeGeminiService'; // ✅ Importar tipo RouteData
 
 export default function Dashboard() {
   const [activeView, setActiveView] = useState('dashboard');
   const { user, logout } = useAuth(); 
 
+  // ✅ ESTADO PARA COMPARTIR RUTA GENERADA ENTRE CHAT Y MAPA
+  const [generatedRoute, setGeneratedRoute] = useState<RouteData | null>(null);
+
   const handleLogout = () => {
     logout();
     window.location.reload();
+  };
+
+  // ✅ FUNCIÓN PARA RECIBIR RUTA DESDE IAChat
+  const handleRouteGenerated = (route: RouteData) => {
+    console.log('🗺️ Dashboard recibió ruta generada:', route);
+    setGeneratedRoute(route);
+    // No cambiamos la vista aquí, IAChat lo hace
+  };
+
+  // ✅ LIMPIAR RUTA AL CAMBIAR DE VISTA (excepto map)
+  const handleViewChange = (view: string) => {
+    if (view !== 'map' && view !== 'chat') {
+      console.log('🧹 Limpiando ruta generada');
+      setGeneratedRoute(null);
+    }
+    setActiveView(view);
   };
   
   const navItems = [
@@ -63,7 +83,7 @@ export default function Dashboard() {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => handleViewChange(item.id)}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all"
                 style={{
                   backgroundColor: activeView === item.id ? '#F2F2F7' : 'transparent',
@@ -98,13 +118,15 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
-        {activeView === 'dashboard' && <DashboardView user={user} setActiveView={setActiveView} />} 
-        {activeView === 'map' && <MapView setActiveView={setActiveView} />} 
-        {activeView === 'events' && <EventsView setActiveView={setActiveView} />} 
-        {activeView === 'chat' && <IAChat setActiveView={setActiveView} />} 
+        {activeView === 'dashboard' && <DashboardView user={user} setActiveView={handleViewChange} />} 
+        {/* ✅ Pasar generatedRoute al MapView */}
+        {activeView === 'map' && <MapView setActiveView={handleViewChange} generatedRoute={generatedRoute} />} 
+        {activeView === 'events' && <EventsView setActiveView={handleViewChange} />} 
+        {/* ✅ Pasar handleRouteGenerated al IAChat */}
+        {activeView === 'chat' && <IAChat setActiveView={handleViewChange} onRouteGenerated={handleRouteGenerated} />} 
         {activeView === 'activities' && <ActivitiesView />}
-        {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={setActiveView} />} 
-        {activeView === 'create-event-manual' && <CreateEventManual setActiveView={setActiveView} />} 
+        {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={handleViewChange} />} 
+        {activeView === 'create-event-manual' && <CreateEventManual setActiveView={handleViewChange} />} 
       </div>
     </div>
   );
@@ -118,76 +140,77 @@ interface DashboardViewProps {
   setActiveView: (view: string) => void;
 }
 
-// Dashboard Home View - CON EVENTOS
+// Dashboard Home View - CON EVENTOS REALES DEL BACKEND
 function DashboardView({ user, setActiveView }: DashboardViewProps) {
-  // Mock data
-  const eventosCreados = [
-    {
-      id: 1,
-      nombre: 'Carrera Anual de Montaña',
-      descripcion: 'Evento ciclista de resistencia en montaña con ruta técnica.',
-      cantidad_participantes: 100,
-      inscritos: 45,
-      origen_carrera: 'Parque Nacional Nevado',
-      destino_fin_carrera: 'Pueblo La Esperanza',
-      km: 12.2,
-      url_banner: '',
-      fecha_evento: '2025-03-15',
-      hora_evento: '08:30:00',
-      estatus: 1,
-      privado: 0
-    },
-    {
-      id: 2,
-      nombre: 'Rodada Nocturna Ciudad',
-      descripcion: 'Paseo recreativo nocturno por el centro histórico.',
-      cantidad_participantes: 50,
-      inscritos: 32,
-      origen_carrera: 'Plaza Central',
-      destino_fin_carrera: 'Parque Ecológico',
-      km: 8.5,
-      url_banner: '',
-      fecha_evento: '2025-04-20',
-      hora_evento: '19:00:00',
-      estatus: 1,
-      privado: 0
-    },
-  ];
+  const [eventosCreados, setEventosCreados] = useState<any[]>([]);
+  const [eventosInscritos, setEventosInscritos] = useState<any[]>([]);
+  const [isLoadingEventos, setIsLoadingEventos] = useState(true);
+  const [errorEventos, setErrorEventos] = useState<string | null>(null);
 
-  const eventosInscritos = [
-    {
-      id: 3,
-      nombre: 'Gran Fondo Chiapas 2025',
-      descripcion: 'Evento competitivo de larga distancia por carreteras escénicas.',
-      cantidad_participantes: 200,
-      inscritos: 178,
-      origen_carrera: 'Estadio Municipal',
-      destino_fin_carrera: 'Mirador Las Nubes',
-      km: 95.3,
-      url_banner: '',
-      fecha_evento: '2025-05-10',
-      hora_evento: '06:00:00',
-      estatus: 1,
-      privado: 0,
-      organizador: 'Club Ciclista Chiapas'
-    },
-    {
-      id: 4,
-      nombre: 'Ruta del Café',
-      descripcion: 'Recorrido por plantaciones de café con paradas gastronómicas.',
-      cantidad_participantes: 60,
-      inscritos: 54,
-      origen_carrera: 'Finca El Manantial',
-      destino_fin_carrera: 'Beneficio La Esperanza',
-      km: 35.7,
-      url_banner: '',
-      fecha_evento: '2025-04-05',
-      hora_evento: '07:30:00',
-      estatus: 1,
-      privado: 0,
-      organizador: 'Ruta Café Tours'
-    },
-  ];
+  // Cargar eventos del usuario al montar el componente
+  useEffect(() => {
+    const cargarEventos = async () => {
+      try {
+        setIsLoadingEventos(true);
+        setErrorEventos(null);
+
+        // Obtener token del localStorage
+        const token = localStorage.getItem('authToken') || localStorage.getItem('access_token');
+        
+        if (!token) {
+          console.error('No se encontró token de autenticación');
+          setErrorEventos('No se encontró sesión activa');
+          setIsLoadingEventos(false);
+          return;
+        }
+
+        console.log('🔍 Cargando eventos del usuario...');
+
+        // Llamar al endpoint de eventos del usuario
+        const response = await fetch('https://jalatealciclismo.ddns.net/event/v1/by_user_id', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        console.log('📡 Respuesta del servidor:', response.status);
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('✅ Eventos recibidos:', data);
+
+        // Si la respuesta es un array directamente
+        if (Array.isArray(data)) {
+          setEventosCreados(data);
+        } 
+        // Si la respuesta tiene una propiedad 'eventos' o 'data'
+        else if (data.eventos) {
+          setEventosCreados(data.eventos);
+        } else if (data.data) {
+          setEventosCreados(data.data);
+        }
+        // Si no encuentra el formato esperado
+        else {
+          console.warn('Formato de respuesta inesperado:', data);
+          setEventosCreados([]);
+        }
+
+      } catch (error) {
+        console.error('❌ Error al cargar eventos:', error);
+        setErrorEventos(error instanceof Error ? error.message : 'Error desconocido');
+        setEventosCreados([]);
+      } finally {
+        setIsLoadingEventos(false);
+      }
+    };
+
+    cargarEventos();
+  }, []); // Se ejecuta una sola vez al montar el componente
 
   const formatearFecha = (fecha: string) => {
     const date = new Date(fecha);
@@ -248,64 +271,127 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
               </Button>
             </div>
 
-            {eventosCreados.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+            {/* Estado de carga */}
+            {isLoadingEventos && (
+              <div className="bg-white rounded-2xl p-8 text-center" style={{ border: '1px solid #E5E5EA' }}>
+                <div className="flex flex-col items-center">
+                  <Navigation className="h-12 w-12 mb-4 animate-spin" style={{ color: '#007AFF' }} />
+                  <p className="text-sm" style={{ color: '#8E8E93' }}>Cargando tus eventos...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Error al cargar */}
+            {!isLoadingEventos && errorEventos && (
+              <div className="bg-white rounded-2xl p-8 text-center" style={{ border: '1px solid #E5E5EA' }}>
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#FFE5E5' }}>
+                    <span className="text-2xl">⚠️</span>
+                  </div>
+                  <h3 className="text-lg font-bold mb-2" style={{ color: '#1C1C1E' }}>Error al cargar eventos</h3>
+                  <p className="text-sm mb-4" style={{ color: '#8E8E93' }}>{errorEventos}</p>
+                  <Button onClick={() => window.location.reload()} className="px-4 py-2 rounded-xl text-sm font-semibold" style={{ backgroundColor: '#007AFF', color: '#FFFFFF' }}>
+                    Reintentar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de eventos */}
+            {!isLoadingEventos && !errorEventos && eventosCreados.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                 {eventosCreados.map((evento) => (
-                  <div key={evento.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
-                    <div className="h-32 lg:h-40 w-full flex items-center justify-center relative" style={{ backgroundColor: evento.url_banner ? 'transparent' : '#E5E5EA' }}>
+                  <div key={evento.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
+                    <div className="h-32 w-full flex items-center justify-center relative" style={{ backgroundColor: evento.url_banner ? 'transparent' : '#E5E5EA' }}>
                       {evento.url_banner ? (
                         <img src={evento.url_banner} alt={evento.nombre} className="w-full h-full object-cover" />
                       ) : (
-                        <BikeIcon className="h-10 w-10 lg:h-12 lg:w-12" style={{ color: '#8E8E93' }} />
+                        <BikeIcon className="h-10 w-10" style={{ color: '#8E8E93' }} />
                       )}
-                      <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: calcularDiasRestantes(evento.fecha_evento) === 'Hoy' ? '#FF3B30' : '#007AFF', color: '#FFFFFF' }}>
+                      <div className="absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: calcularDiasRestantes(evento.fecha_evento) === 'Hoy' ? '#FF3B30' : '#007AFF', color: '#FFFFFF' }}>
                         {calcularDiasRestantes(evento.fecha_evento)}
                       </div>
-                      {evento.privado === 1 && (
-                        <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: '#8E8E93', color: '#FFFFFF' }}>Privado</div>
-                      )}
+   
                     </div>
 
-                    <div className="p-4 lg:p-5">
-                      <h3 className="text-base lg:text-lg font-bold mb-2 line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.nombre}</h3>
-                      <p className="text-xs lg:text-sm mb-3 line-clamp-2" style={{ color: '#8E8E93' }}>{evento.descripcion}</p>
+                    <div className="p-4">
+                      <h3 className="text-base font-bold mb-1 line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.nombre}</h3>
+                      <p className="text-sm mb-3 line-clamp-1" style={{ color: '#8E8E93' }}>{evento.descripcion}</p>
 
                       <div className="space-y-2 mb-3">
-                        <div className="flex items-center text-xs lg:text-sm">
-                          <Calendar className="h-3.5 w-3.5 mr-2 flex-shrink-0" style={{ color: '#007AFF' }} />
+                        <div className="flex items-center text-sm">
+                          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#007AFF' }} />
                           <span style={{ color: '#1C1C1E' }}>{formatearFecha(evento.fecha_evento)} • {formatearHora(evento.hora_evento)}</span>
                         </div>
-                        <div className="flex items-center text-xs lg:text-sm">
-                          <MapPin className="h-3.5 w-3.5 mr-2 flex-shrink-0" style={{ color: '#34C759' }} />
+                        <div className="flex items-center text-sm">
+                          <MapPin className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#34C759' }} />
                           <span className="line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.origen_carrera}</span>
                         </div>
-                        <div className="flex items-center justify-between text-xs lg:text-sm">
+                        {/* Participantes */}
+                        <div className="flex items-center text-sm">
+                          <Users className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#8E8E93' }} />
+                          <span style={{ color: '#1C1C1E' }}>
+                            Participantes: {evento.inscritos || 0}/{evento.cantidad_participantes}
+                          </span>
+                        </div>
+
+                        {/* Distancia y Badge Privado/Público */}
+                        <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center">
-                            <Navigation className="h-3.5 w-3.5 mr-2" style={{ color: '#FF9500' }} />
+                            <Navigation className="h-4 w-4 mr-2" style={{ color: '#FF9500' }} />
                             <span style={{ color: '#1C1C1E' }}>{evento.km} km</span>
                           </div>
-                          <div className="flex items-center">
-                            <Users className="h-3.5 w-3.5 mr-2" style={{ color: '#8E8E93' }} />
-                            <span style={{ color: '#1C1C1E' }}>{evento.inscritos}/{evento.cantidad_participantes}</span>
-                          </div>
+                          
+                          {/* ✅ INDICADOR PRIVADO/PÚBLICO */}
+                          <span 
+                            className="text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1" 
+                            style={{ 
+                              backgroundColor: evento.privado === 1 ? '#FF3B3020' : '#34C75920',
+                              color: evento.privado === 1 ? '#FF3B30' : '#34C759'
+                            }}
+                          >
+                            {evento.privado === 1 ? '🔒 Privado' : '🌐 Público'}
+                          </span>
                         </div>
+
+                        {/* Clave de acceso (solo si existe) */}
+                        {evento.clave && (
+                          <div 
+                            className="flex items-center justify-between text-xs pt-1.5" 
+                            style={{ borderTop: '1px solid #F2F2F7' }}
+                          >
+                            <span style={{ color: '#8E8E93' }}>Clave de acceso:</span>
+                            <span 
+                              className="font-mono font-semibold px-2 py-0.5 rounded" 
+                              style={{ 
+                                backgroundColor: '#007AFF15', 
+                                color: '#007AFF' 
+                              }}
+                            >
+                              {evento.clave}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="mb-3">
                         <div className="w-full h-1.5 rounded-full" style={{ backgroundColor: '#F2F2F7' }}>
-                          <div className="h-1.5 rounded-full transition-all" style={{ backgroundColor: '#007AFF', width: `${(evento.inscritos / evento.cantidad_participantes) * 100}%` }} />
+                          <div className="h-1.5 rounded-full transition-all" style={{ backgroundColor: '#007AFF', width: `${((evento.inscritos || 0) / evento.cantidad_participantes) * 100}%` }} />
                         </div>
                       </div>
 
                       <div className="flex gap-2">
-                        <Button className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: '#F2F2F7', color: '#007AFF' }}>Ver Detalles</Button>
-                        <Button className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: '#007AFF', color: '#FFFFFF' }}>Editar</Button>
+                        <Button className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: '#F2F2F7', color: '#007AFF' }}>Ver Detalles</Button>
+                        <Button className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: '#007AFF', color: '#FFFFFF' }}>Editar</Button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
+            )}
+
+            {/* Empty state - sin eventos */}
+            {!isLoadingEventos && !errorEventos && eventosCreados.length === 0 && (
               <div className="bg-white rounded-2xl p-8 text-center" style={{ border: '1px solid #E5E5EA' }}>
                 <Calendar className="h-12 w-12 mx-auto mb-3" style={{ color: '#E5E5EA' }} />
                 <h3 className="text-lg font-bold mb-2" style={{ color: '#1C1C1E' }}>No has creado eventos</h3>
@@ -323,50 +409,50 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
             </div>
 
             {eventosInscritos.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                 {eventosInscritos.map((evento) => (
-                  <div key={evento.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
-                    <div className="h-32 lg:h-40 w-full flex items-center justify-center relative" style={{ backgroundColor: evento.url_banner ? 'transparent' : '#E5E5EA' }}>
+                  <div key={evento.id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
+                    <div className="h-32 w-full flex items-center justify-center relative" style={{ backgroundColor: evento.url_banner ? 'transparent' : '#E5E5EA' }}>
                       {evento.url_banner ? (
                         <img src={evento.url_banner} alt={evento.nombre} className="w-full h-full object-cover" />
                       ) : (
-                        <BikeIcon className="h-10 w-10 lg:h-12 lg:w-12" style={{ color: '#8E8E93' }} />
+                        <BikeIcon className="h-10 w-10" style={{ color: '#8E8E93' }} />
                       )}
-                      <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: calcularDiasRestantes(evento.fecha_evento) === 'Hoy' ? '#FF3B30' : '#34C759', color: '#FFFFFF' }}>
+                      <div className="absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: calcularDiasRestantes(evento.fecha_evento) === 'Hoy' ? '#FF3B30' : '#34C759', color: '#FFFFFF' }}>
                         {calcularDiasRestantes(evento.fecha_evento)}
                       </div>
-                      <div className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1" style={{ backgroundColor: '#34C759', color: '#FFFFFF' }}>
+                      <div className="absolute top-2 left-2 px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1" style={{ backgroundColor: '#34C759', color: '#FFFFFF' }}>
                         <Activity className="h-3 w-3" />
                         Inscrito
                       </div>
                     </div>
 
-                    <div className="p-4 lg:p-5">
-                      <h3 className="text-base lg:text-lg font-bold mb-2 line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.nombre}</h3>
+                    <div className="p-4">
+                      <h3 className="text-base font-bold mb-1 line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.nombre}</h3>
                       {evento.organizador && (
                         <p className="text-xs mb-2 flex items-center" style={{ color: '#8E8E93' }}>
                           <User className="h-3 w-3 mr-1" />
                           {evento.organizador}
                         </p>
                       )}
-                      <p className="text-xs lg:text-sm mb-3 line-clamp-2" style={{ color: '#8E8E93' }}>{evento.descripcion}</p>
+                      <p className="text-sm mb-3 line-clamp-1" style={{ color: '#8E8E93' }}>{evento.descripcion}</p>
 
                       <div className="space-y-2 mb-3">
-                        <div className="flex items-center text-xs lg:text-sm">
-                          <Calendar className="h-3.5 w-3.5 mr-2 flex-shrink-0" style={{ color: '#007AFF' }} />
+                        <div className="flex items-center text-sm">
+                          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#007AFF' }} />
                           <span style={{ color: '#1C1C1E' }}>{formatearFecha(evento.fecha_evento)} • {formatearHora(evento.hora_evento)}</span>
                         </div>
-                        <div className="flex items-center text-xs lg:text-sm">
-                          <MapPin className="h-3.5 w-3.5 mr-2 flex-shrink-0" style={{ color: '#34C759' }} />
+                        <div className="flex items-center text-sm">
+                          <MapPin className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#34C759' }} />
                           <span className="line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.origen_carrera}</span>
                         </div>
-                        <div className="flex items-center justify-between text-xs lg:text-sm">
+                        <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center">
-                            <Navigation className="h-3.5 w-3.5 mr-2" style={{ color: '#FF9500' }} />
+                            <Navigation className="h-4 w-4 mr-2" style={{ color: '#FF9500' }} />
                             <span style={{ color: '#1C1C1E' }}>{evento.km} km</span>
                           </div>
                           <div className="flex items-center">
-                            <Users className="h-3.5 w-3.5 mr-2" style={{ color: '#8E8E93' }} />
+                            <Users className="h-4 w-4 mr-2" style={{ color: '#8E8E93' }} />
                             <span style={{ color: '#1C1C1E' }}>{evento.inscritos}/{evento.cantidad_participantes}</span>
                           </div>
                         </div>
@@ -379,8 +465,8 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button className="flex-1 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: '#007AFF', color: '#FFFFFF' }}>Ver Ruta</Button>
-                        <Button className="px-3 py-2 rounded-lg text-xs font-medium" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Cancelar</Button>
+                        <Button className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: '#007AFF', color: '#FFFFFF' }}>Ver Ruta</Button>
+                        <Button className="px-3 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: '#FF3B30', color: '#FFFFFF' }}>Cancelar</Button>
                       </div>
                     </div>
                   </div>
@@ -473,11 +559,11 @@ function EventsView({ setActiveView }: { setActiveView: (view: string) => void }
           </div>
 
           <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm opacity-60" style={{ border: '1px solid #E5E5EA' }}>
-            <div className="flex items-start space-x-4" onClick={() => setActiveView('chat')}>
+            <div className="flex items-start space-x-4">
               <div className="p-3 rounded-xl flex-shrink-0" style={{ backgroundColor: '#8E8E93' }}>
                 <Sparkles className="h-6 w-6" style={{ color: '#FFFFFF' }} />
               </div>
-              <div className="flex-1">
+              <div className="flex-1" onClick={() => setActiveView('chat')}>
                 <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
                   Crear Evento con IA
                   <span className="ml-2 text-xs font-normal px-2 py-1 rounded-full" style={{ backgroundColor: '#FF9500', color: '#FFFFFF' }}>Próximamente</span>
