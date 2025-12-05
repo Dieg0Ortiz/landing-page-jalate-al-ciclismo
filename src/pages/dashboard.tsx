@@ -311,9 +311,7 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
                       <div className="absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: calcularDiasRestantes(evento.fecha_evento) === 'Hoy' ? '#FF3B30' : '#007AFF', color: '#FFFFFF' }}>
                         {calcularDiasRestantes(evento.fecha_evento)}
                       </div>
-                      {evento.privado === 1 && (
-                        <div className="absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: '#8E8E93', color: '#FFFFFF' }}>Privado</div>
-                      )}
+   
                     </div>
 
                     <div className="p-4">
