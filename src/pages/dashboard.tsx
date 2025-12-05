@@ -331,7 +331,7 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
                         <div className="flex items-center text-sm">
                           <Users className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#8E8E93' }} />
                           <span style={{ color: '#1C1C1E' }}>
-                            Participantes: {evento.inscritos || 0}/{evento.cantidad_participantes}
+                            Participantes: {evento.inscritos || evento.registered_users_count}/{evento.cantidad_participantes}
                           </span>
                         </div>
 
