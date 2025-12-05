@@ -24,14 +24,34 @@ import { CreateEventManual } from './CreateEventManual'
 import { CreateRouteManual } from './CreateRouteManual'
 import MapView from './MapView';
 import IAChat from './IAChat';
+import { RouteData } from './routeGeminiService'; // ✅ Importar tipo RouteData
 
 export default function Dashboard() {
   const [activeView, setActiveView] = useState('dashboard');
   const { user, logout } = useAuth(); 
 
+  // ✅ ESTADO PARA COMPARTIR RUTA GENERADA ENTRE CHAT Y MAPA
+  const [generatedRoute, setGeneratedRoute] = useState<RouteData | null>(null);
+
   const handleLogout = () => {
     logout();
     window.location.reload();
+  };
+
+  // ✅ FUNCIÓN PARA RECIBIR RUTA DESDE IAChat
+  const handleRouteGenerated = (route: RouteData) => {
+    console.log('🗺️ Dashboard recibió ruta generada:', route);
+    setGeneratedRoute(route);
+    // No cambiamos la vista aquí, IAChat lo hace
+  };
+
+  // ✅ LIMPIAR RUTA AL CAMBIAR DE VISTA (excepto map)
+  const handleViewChange = (view: string) => {
+    if (view !== 'map' && view !== 'chat') {
+      console.log('🧹 Limpiando ruta generada');
+      setGeneratedRoute(null);
+    }
+    setActiveView(view);
   };
   
   const navItems = [
@@ -63,7 +83,7 @@ export default function Dashboard() {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => handleViewChange(item.id)}
                 className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all"
                 style={{
                   backgroundColor: activeView === item.id ? '#F2F2F7' : 'transparent',
@@ -98,13 +118,15 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen">
-        {activeView === 'dashboard' && <DashboardView user={user} setActiveView={setActiveView} />} 
-        {activeView === 'map' && <MapView setActiveView={setActiveView} />} 
-        {activeView === 'events' && <EventsView setActiveView={setActiveView} />} 
-        {activeView === 'chat' && <IAChat setActiveView={setActiveView} />} 
+        {activeView === 'dashboard' && <DashboardView user={user} setActiveView={handleViewChange} />} 
+        {/* ✅ Pasar generatedRoute al MapView */}
+        {activeView === 'map' && <MapView setActiveView={handleViewChange} generatedRoute={generatedRoute} />} 
+        {activeView === 'events' && <EventsView setActiveView={handleViewChange} />} 
+        {/* ✅ Pasar handleRouteGenerated al IAChat */}
+        {activeView === 'chat' && <IAChat setActiveView={handleViewChange} onRouteGenerated={handleRouteGenerated} />} 
         {activeView === 'activities' && <ActivitiesView />}
-        {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={setActiveView} />} 
-        {activeView === 'create-event-manual' && <CreateEventManual setActiveView={setActiveView} />} 
+        {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={handleViewChange} />} 
+        {activeView === 'create-event-manual' && <CreateEventManual setActiveView={handleViewChange} />} 
       </div>
     </div>
   );
@@ -177,43 +199,6 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
           console.warn('Formato de respuesta inesperado:', data);
           setEventosCreados([]);
         }
-
-        // Por ahora, eventos inscritos siguen siendo mock
-        // TODO: Implementar endpoint para eventos inscritos
-        setEventosInscritos([
-          {
-            id: 3,
-            nombre: 'Gran Fondo Chiapas 2025',
-            descripcion: 'Evento competitivo de larga distancia por carreteras escénicas.',
-            cantidad_participantes: 200,
-            inscritos: 178,
-            origen_carrera: 'Estadio Municipal',
-            destino_fin_carrera: 'Mirador Las Nubes',
-            km: 95.3,
-            url_banner: '',
-            fecha_evento: '2025-05-10',
-            hora_evento: '06:00:00',
-            estatus: 1,
-            privado: 0,
-            organizador: 'Club Ciclista Chiapas'
-          },
-          {
-            id: 4,
-            nombre: 'Ruta del Café',
-            descripcion: 'Recorrido por plantaciones de café con paradas gastronómicas.',
-            cantidad_participantes: 60,
-            inscritos: 54,
-            origen_carrera: 'Finca El Manantial',
-            destino_fin_carrera: 'Beneficio La Esperanza',
-            km: 35.7,
-            url_banner: '',
-            fecha_evento: '2025-04-05',
-            hora_evento: '07:30:00',
-            estatus: 1,
-            privado: 0,
-            organizador: 'Ruta Café Tours'
-          },
-        ]);
 
       } catch (error) {
         console.error('❌ Error al cargar eventos:', error);
@@ -344,16 +329,51 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
                           <MapPin className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#34C759' }} />
                           <span className="line-clamp-1" style={{ color: '#1C1C1E' }}>{evento.origen_carrera}</span>
                         </div>
+                        {/* Participantes */}
+                        <div className="flex items-center text-sm">
+                          <Users className="h-4 w-4 mr-2 flex-shrink-0" style={{ color: '#8E8E93' }} />
+                          <span style={{ color: '#1C1C1E' }}>
+                            Participantes: {evento.inscritos || 0}/{evento.cantidad_participantes}
+                          </span>
+                        </div>
+
+                        {/* Distancia y Badge Privado/Público */}
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center">
                             <Navigation className="h-4 w-4 mr-2" style={{ color: '#FF9500' }} />
                             <span style={{ color: '#1C1C1E' }}>{evento.km} km</span>
                           </div>
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-2" style={{ color: '#8E8E93' }} />
-                            <span style={{ color: '#1C1C1E' }}>{evento.inscritos || 0}/{evento.cantidad_participantes}</span>
-                          </div>
+                          
+                          {/* ✅ INDICADOR PRIVADO/PÚBLICO */}
+                          <span 
+                            className="text-xs font-medium px-2 py-0.5 rounded-full flex items-center gap-1" 
+                            style={{ 
+                              backgroundColor: evento.privado === 1 ? '#FF3B3020' : '#34C75920',
+                              color: evento.privado === 1 ? '#FF3B30' : '#34C759'
+                            }}
+                          >
+                            {evento.privado === 1 ? '🔒 Privado' : '🌐 Público'}
+                          </span>
                         </div>
+
+                        {/* Clave de acceso (solo si existe) */}
+                        {evento.clave && (
+                          <div 
+                            className="flex items-center justify-between text-xs pt-1.5" 
+                            style={{ borderTop: '1px solid #F2F2F7' }}
+                          >
+                            <span style={{ color: '#8E8E93' }}>Clave de acceso:</span>
+                            <span 
+                              className="font-mono font-semibold px-2 py-0.5 rounded" 
+                              style={{ 
+                                backgroundColor: '#007AFF15', 
+                                color: '#007AFF' 
+                              }}
+                            >
+                              {evento.clave}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="mb-3">
@@ -545,7 +565,7 @@ function EventsView({ setActiveView }: { setActiveView: (view: string) => void }
               <div className="p-3 rounded-xl flex-shrink-0" style={{ backgroundColor: '#8E8E93' }}>
                 <Sparkles className="h-6 w-6" style={{ color: '#FFFFFF' }} />
               </div>
-              <div className="flex-1">
+              <div className="flex-1" onClick={() => setActiveView('chat')}>
                 <h3 className="text-lg lg:text-xl font-bold mb-2" style={{ color: '#1C1C1E' }}>
                   Crear Evento con IA
                   <span className="ml-2 text-xs font-normal px-2 py-1 rounded-full" style={{ backgroundColor: '#FF9500', color: '#FFFFFF' }}>Próximamente</span>
