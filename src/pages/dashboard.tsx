@@ -22,7 +22,7 @@ import { useAuth } from './AuthContext';
 
 import { CreateEventManual } from './CreateEventManual'
 import { CreateRouteManual } from './CreateRouteManual'
-import MapView from './MapView';
+import MapView, { SavedRoute } from './MapView';
 import IAChat from './IAChat';
 import { RouteData } from './routeGeminiService'; // ✅ Importar tipo RouteData
 
@@ -43,6 +43,32 @@ export default function Dashboard() {
     console.log('🗺️ Dashboard recibió ruta generada:', route);
     setGeneratedRoute(route);
     // No cambiamos la vista aquí, IAChat lo hace
+  };
+
+  // ✅ FUNCIÓN PARA CARGAR RUTA GUARDADA DESDE ACTIVIDADES
+  const handleViewActivity = (savedRoute: SavedRoute) => {
+    console.log('👀 Viendo actividad guardada:', savedRoute);
+    
+    // Convertir SavedRoute a RouteData para que MapView lo entienda
+    // OJO: MapView espera RouteData, pero también tiene lógica para SavedRoute.
+    // Vamos a adaptar los datos para que MapView los reciba como generatedRoute
+    // O idealmente, MapView debería aceptar una prop `savedRouteToLoad`
+    
+    // Adaptación simple a RouteData para reutilizar la prop existente
+    const routeData: RouteData = {
+      origin: { lat: savedRoute.waypoints[0].lat, lng: savedRoute.waypoints[0].lng },
+      destination: { lat: savedRoute.waypoints[savedRoute.waypoints.length - 1].lat, lng: savedRoute.waypoints[savedRoute.waypoints.length - 1].lng },
+      waypoints: savedRoute.waypoints.slice(1, -1).map(wp => ({ lat: wp.lat, lng: wp.lng })),
+      name: savedRoute.name,
+      distance: `${savedRoute.metadata.distance.toFixed(2)} km`,
+      elevation: 'N/A', // No guardamos elevación aún
+      difficulty: 'Media',
+      terrain: 'Pavimento', // Valor por defecto
+      warnings: [] // Agregamos warnings vacío para cumplir con la interfaz
+    };
+
+    setGeneratedRoute(routeData);
+    setActiveView('map');
   };
 
   // ✅ LIMPIAR RUTA AL CAMBIAR DE VISTA (excepto map)
@@ -124,7 +150,7 @@ export default function Dashboard() {
         {activeView === 'events' && <EventsView setActiveView={handleViewChange} />} 
         {/* ✅ Pasar handleRouteGenerated al IAChat */}
         {activeView === 'chat' && <IAChat setActiveView={handleViewChange} onRouteGenerated={handleRouteGenerated} />} 
-        {activeView === 'activities' && <ActivitiesView />}
+        {activeView === 'activities' && <ActivitiesView onViewActivity={handleViewActivity} />}
         {activeView === 'create-route-manual' && <CreateRouteManual setActiveView={handleViewChange} />} 
         {activeView === 'create-event-manual' && <CreateEventManual setActiveView={handleViewChange} />} 
       </div>
@@ -146,6 +172,23 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
   const [eventosInscritos, setEventosInscritos] = useState<any[]>([]);
   const [isLoadingEventos, setIsLoadingEventos] = useState(true);
   const [errorEventos, setErrorEventos] = useState<string | null>(null);
+  const [savedActivities, setSavedActivities] = useState<SavedRoute[]>([]);
+
+  // Cargar rutas guardadas de localStorage
+  useEffect(() => {
+    const loadSavedRoutes = () => {
+      const routesStr = localStorage.getItem('my_saved_routes');
+      if (routesStr) {
+        try {
+          const routes = JSON.parse(routesStr);
+          setSavedActivities(routes);
+        } catch (e) {
+          console.error('Error cargando rutas guardadas:', e);
+        }
+      }
+    };
+    loadSavedRoutes();
+  }, []);
 
   // Cargar eventos del usuario al montar el componente
   useEffect(() => {
@@ -504,27 +547,36 @@ function DashboardView({ user, setActiveView }: DashboardViewProps) {
               <button onClick={() => setActiveView('activities')} className="text-sm font-medium hover:opacity-70 transition-opacity" style={{ color: '#007AFF' }}>Ver Todas</button>
             </div>
             <div className="space-y-3 lg:space-y-4">
-              {[
-                { name: 'Ruta Cañón del Sumidero', distance: '65.4 km', time: '2:45', elevation: '850 m' },
-                { name: 'Circuito Tuxtla - Terreno Mixto', distance: '42.3 km', time: '1:45', elevation: '520 m' },
-                { name: 'Ruta Panorámica', distance: '38.2 km', time: '1:32', elevation: '380 m' },
-              ].map((activity, i) => (
-                <div key={i} className="p-4 rounded-xl hover:shadow-md transition-shadow cursor-pointer" style={{ backgroundColor: '#F2F2F7', border: '1px solid #E5E5EA' }}>
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1 text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.name}</h3>
-                      <div className="flex items-center flex-wrap gap-2 lg:gap-4 text-xs lg:text-sm" style={{ color: '#8E8E93' }}>
-                        <span>{activity.distance}</span>
-                        <span>•</span>
-                        <span>{activity.time}</span>
-                        <span>•</span>
-                        <span>{activity.elevation} elev</span>
-                      </div>
-                    </div>
-                    <Button className="self-start lg:self-center bg-transparent hover:bg-gray-100 text-blue-500 text-sm">Ver Detalles</Button>
-                  </div>
+              {savedActivities.length === 0 ? (
+                <div className="text-center py-6">
+                  <MapPin className="h-10 w-10 mx-auto mb-2" style={{ color: '#E5E5EA' }} />
+                  <p className="text-sm" style={{ color: '#8E8E93' }}>No tienes actividades guardadas</p>
+                  <p className="text-xs mt-1" style={{ color: '#C7C7CC' }}>Guarda tus rutas desde el mapa</p>
                 </div>
-              ))}
+              ) : (
+                savedActivities.slice(0, 3).map((activity) => (
+                  <div key={activity.id} className="p-4 rounded-xl hover:shadow-md transition-shadow cursor-pointer" style={{ backgroundColor: '#F2F2F7', border: '1px solid #E5E5EA' }}>
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold mb-1 text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.name}</h3>
+                        <div className="flex items-center flex-wrap gap-2 lg:gap-4 text-xs lg:text-sm" style={{ color: '#8E8E93' }}>
+                          <span>{activity.metadata.distance.toFixed(2)} km</span>
+                          <span>•</span>
+                          <span>~{Math.round(activity.metadata.duration)} min</span>
+                          <span>•</span>
+                          <span>{activity.waypoints.length} puntos</span>
+                        </div>
+                      </div>
+                      <Button 
+                        onClick={() => setActiveView('activities')}
+                        className="self-start lg:self-center bg-transparent hover:bg-gray-100 text-blue-500 text-sm"
+                      >
+                        Ver Detalles
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -579,31 +631,29 @@ function EventsView({ setActiveView }: { setActiveView: (view: string) => void }
 }
 
 // Activities View
-function ActivitiesView() {
-  const [activeTab, setActiveTab] = useState('recent');
+interface ActivitiesViewProps {
+  onViewActivity?: (route: SavedRoute) => void;
+}
 
-  const activities = [
-    {
-      id: 1,
-      name: 'Circuito Matutino El Jobo',
-      date: '21 Oct 2025',
-      distance: '42.3 km',
-      time: '1:45:32',
-      elevation: '520 m',
-      avgSpeed: '24.1 km/h',
-      analysis: '¡Gran esfuerzo en la subida "El Jobo"! Tu ritmo fue constante.'
-    },
-    {
-      id: 2,
-      name: 'Ruta de Carretera - Chiapa',
-      date: '19 Oct 2025',
-      distance: '68.5 km',
-      time: '2:30:15',
-      elevation: '890 m',
-      avgSpeed: '27.4 km/h',
-      analysis: 'Excelente mejora en tu cadencia. Mantén este ritmo en subidas largas.'
-    },
-  ];
+function ActivitiesView({ onViewActivity }: ActivitiesViewProps) {
+  const [activeTab, setActiveTab] = useState('recent');
+  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([]);
+
+  // Cargar rutas guardadas al montar
+  useEffect(() => {
+    const loadRoutes = () => {
+      const routesStr = localStorage.getItem('my_saved_routes');
+      if (routesStr) {
+        try {
+          const routes = JSON.parse(routesStr);
+          setSavedRoutes(routes);
+        } catch (e) {
+          console.error('Error cargando rutas:', e);
+        }
+      }
+    };
+    loadRoutes();
+  }, []);
 
   return (
     <>
@@ -629,58 +679,67 @@ function ActivitiesView() {
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8">
           {activeTab === 'recent' ? (
             <div className="space-y-4">
-              {activities.map((activity) => (
-                <div key={activity.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
-                  <div className="h-32 lg:h-48 w-full flex items-center justify-center" style={{ backgroundColor: '#E5E5EA' }}>
-                    <MapPin className="h-12 w-12" style={{ color: '#8E8E93' }} />
-                  </div>
-                  <div className="p-4 lg:p-6">
-                    <h3 className="text-lg lg:text-xl font-bold mb-1" style={{ color: '#1C1C1E' }}>{activity.name}</h3>
-                    <div className="flex items-center text-sm mb-4" style={{ color: '#8E8E93' }}>
-                      <Calendar className="h-4 w-4 mr-1" />{activity.date}
-                    </div>
-                    <div className="grid grid-cols-4 gap-3 lg:gap-4 mb-4">
-                      <div>
-                        <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
-                          <MapPin className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                          <span className="text-xs">Distancia</span>
-                        </div>
-                        <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.distance}</p>
-                      </div>
-                      <div>
-                        <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
-                          <Clock className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                          <span className="text-xs">Tiempo</span>
-                        </div>
-                        <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.time}</p>
-                      </div>
-                      <div>
-                        <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
-                          <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                          <span className="text-xs">Desnivel</span>
-                        </div>
-                        <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.elevation}</p>
-                      </div>
-                      <div>
-                        <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
-                          <Zap className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                          <span className="text-xs">Vel. Prom.</span>
-                        </div>
-                        <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{activity.avgSpeed}</p>
-                      </div>
-                    </div>
-                    <div className="p-3 lg:p-4 rounded-xl" style={{ backgroundColor: '#F2F2F7' }}>
-                      <div className="flex items-start space-x-2">
-                        <Activity className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#007AFF' }} />
-                        <div>
-                          <p className="text-xs font-medium mb-1" style={{ color: '#007AFF' }}>Análisis IA:</p>
-                          <p className="text-xs lg:text-sm" style={{ color: '#1C1C1E' }}>{activity.analysis}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              {savedRoutes.length === 0 ? (
+                <div className="text-center py-10 bg-white rounded-2xl border border-gray-200">
+                  <MapPin className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                  <h3 className="text-lg font-medium text-gray-900">No hay actividades guardadas</h3>
+                  <p className="text-gray-500">Guarda tus rutas desde la vista de Mapa</p>
                 </div>
-              ))}
+              ) : (
+                savedRoutes.map((route) => (
+                  <div key={route.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer" style={{ border: '1px solid #E5E5EA' }}>
+                    <div className="h-32 lg:h-48 w-full flex items-center justify-center" style={{ backgroundColor: '#E5E5EA' }}>
+                      <MapPin className="h-12 w-12" style={{ color: '#8E8E93' }} />
+                    </div>
+                    <div className="p-4 lg:p-6">
+                      <h3 className="text-lg lg:text-xl font-bold mb-1" style={{ color: '#1C1C1E' }}>{route.name}</h3>
+                      <div className="flex items-center text-sm mb-4" style={{ color: '#8E8E93' }}>
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {new Date(route.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="grid grid-cols-4 gap-3 lg:gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
+                            <MapPin className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                            <span className="text-xs">Distancia</span>
+                          </div>
+                          <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{route.metadata.distance.toFixed(2)} km</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
+                            <Clock className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                            <span className="text-xs">Tiempo</span>
+                          </div>
+                          <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{Math.round(route.metadata.duration)} min</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
+                            <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                            <span className="text-xs">Puntos</span>
+                          </div>
+                          <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>{route.waypoints.length}</p>
+                        </div>
+                        <div>
+                          <div className="flex items-center mb-1" style={{ color: '#8E8E93' }}>
+                            <Zap className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                            <span className="text-xs">Modo</span>
+                          </div>
+                          <p className="font-bold text-sm lg:text-base" style={{ color: '#1C1C1E' }}>Bici</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-end">
+                        <Button 
+                          onClick={() => onViewActivity && onViewActivity(route)}
+                          className="bg-transparent hover:bg-gray-100 text-blue-500 text-sm"
+                        >
+                          Ver Detalles
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           ) : (
             <div className="space-y-6">

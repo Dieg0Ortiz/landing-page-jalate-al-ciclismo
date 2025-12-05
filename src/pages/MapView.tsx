@@ -226,36 +226,31 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
     const savedRoute = prepareRouteForSaving();
     
     console.log('📍 Ruta preparada para guardar:', savedRoute);
-    console.log('📄 JSON para enviar al backend:', JSON.stringify(savedRoute, null, 2));
 
     try {
-      // OPCIÓN 1: Guardar en LocalStorage (para pruebas)
-      localStorage.setItem(`route_${savedRoute.id}`, JSON.stringify(savedRoute));
+      // OPCIÓN 1: Guardar en LocalStorage (Lista de actividades)
+      const existingRoutesStr = localStorage.getItem('my_saved_routes');
+      let existingRoutes: SavedRoute[] = [];
       
-      // OPCIÓN 2: Guardar en tu backend (descomenta cuando tengas el endpoint)
-      /*
-      const response = await fetch('/api/routes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(savedRoute),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al guardar la ruta');
+      if (existingRoutesStr) {
+        try {
+          existingRoutes = JSON.parse(existingRoutesStr);
+        } catch (e) {
+          console.error('Error al parsear rutas existentes', e);
+        }
       }
       
-      const result = await response.json();
-      console.log('Ruta guardada exitosamente:', result);
-      */
+      // Agregar la nueva ruta al principio
+      const updatedRoutes = [savedRoute, ...existingRoutes];
+      localStorage.setItem('my_saved_routes', JSON.stringify(updatedRoutes));
       
-      alert(`✅ Ruta guardada exitosamente!\n\n` +
-            `📍 ID: ${savedRoute.id}\n` +
+      // También guardamos individualmente por si acaso se necesita acceso directo por ID
+      localStorage.setItem(`route_${savedRoute.id}`, JSON.stringify(savedRoute));
+      
+      alert(`✅ Ruta guardada exitosamente en Mis Actividades!\n\n` +
+            `📍 Nombre: ${savedRoute.name}\n` +
             `📏 Distancia: ${distance.toFixed(2)} km\n` +
-            `⏱️ Tiempo: ~${Math.round(duration)} min\n` +
-            `🎯 Puntos: ${route.length}\n` +
-            `📱 Esta ruta puede ser cargada en el móvil usando el ID`);
+            `⏱️ Tiempo: ~${Math.round(duration)} min`);
       
     } catch (error) {
       console.error('Error guardando la ruta:', error);
@@ -597,6 +592,31 @@ export default function MapView({ setActiveView, generatedRoute }: MapViewProps)
               <Layers className="h-4 w-4" style={{ color: '#007AFF' }} />
             </button>
           </div>
+        </div>
+
+        {/* 🔥 BOTÓN FLOTANTE GUARDAR RUTA - Esquina inferior derecha */}
+        <div 
+          className="z-50"
+          style={{
+            position: 'fixed',
+            bottom: '100px',
+            right: '20px',
+          }}
+        >
+          <button
+            onClick={handleSaveRoute}
+            disabled={route.length < 2}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl shadow-lg font-semibold text-sm transition-all hover:scale-105"
+            style={{
+              backgroundColor: route.length >= 2 ? '#007AFF' : '#C7C7CC',
+              color: '#FFFFFF',
+              cursor: route.length >= 2 ? 'pointer' : 'not-allowed',
+              boxShadow: route.length >= 2 ? '0 4px 12px rgba(0, 122, 255, 0.4)' : 'none',
+            }}
+          >
+            <Save className="h-5 w-5" />
+            <span>Guardar Ruta</span>
+          </button>
         </div>
       </div>
 
